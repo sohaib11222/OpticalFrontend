@@ -6,7 +6,7 @@ const en = {
   "nav.groupCommerce": "Products and sales",
   "nav.groupRecords": "Documents and activity",
   "nav.groupAdministration": "Administration",
-  "app.name": "Optical Shop",
+  "app.name": "Vista Express 360",
   "app.tagline": "Optical shop management",
 
   "common.loading": "Loading…",
@@ -155,7 +155,7 @@ const it = {
   "nav.groupCommerce": "Prodotti e vendite",
   "nav.groupRecords": "Documenti e attività",
   "nav.groupAdministration": "Amministrazione",
-  "app.name": "Optical Shop",
+  "app.name": "Vista Express 360",
   "app.tagline": "Gestione negozio ottico",
 
   "common.loading": "Caricamento…",

@@ -216,8 +216,8 @@ export function TranslationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.title = language === "it"
-      ? "Optical Shop â€” Gestione negozio ottico"
-      : "Optical Shop â€” Optical shop management";
+      ? "Vista Express 360 - Gestione negozio ottico"
+      : "Vista Express 360 - Optical shop management";
   }, [language]);
 
   const setLanguage = useCallback((next: Language) => {

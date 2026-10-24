@@ -9,23 +9,31 @@ import { useTranslation } from "@/i18n";
 export function VistaSignIn({ connect = false }: { connect?: boolean }) {
   const { t, translateError } = useTranslation();
   const [enabled, setEnabled] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
+    setChecking(true);
+    setError("");
     void api
       .request<{ data: { enabled: boolean } }>("/auth/vista/config")
       .then((r) => {
         if (active) setEnabled(r.data.enabled);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) {
+          setEnabled(false);
+          setError(t("common.connectionFailed"));
+        }
+      })
+      .finally(() => { if (active) setChecking(false); });
     return () => {
       active = false;
     };
-  }, []);
-
-  if (!enabled) return null;
+  }, [attempt, t]);
 
   return (
     <div className="space-y-2 my-4">
@@ -33,7 +41,7 @@ export function VistaSignIn({ connect = false }: { connect?: boolean }) {
         type="button"
         variant="outline"
         className="w-full"
-        disabled={busy}
+        disabled={busy || checking || !enabled}
         onClick={() => {
           setBusy(true);
           setError("");
@@ -58,6 +66,14 @@ export function VistaSignIn({ connect = false }: { connect?: boolean }) {
             ? t("vista.connectBtn")
             : t("vista.signInBtn")}
       </Button>
+      {!checking && !enabled && (
+        <div className="text-sm text-muted-foreground" role="status">
+          <p>{t("vista.signInUnavailable")}</p>
+          <Button type="button" variant="link" className="px-0" onClick={() => setAttempt((value) => value + 1)}>
+            {t("vista.retryAvailability")}
+          </Button>
+        </div>
+      )}
       {error && (
         <p role="alert" className="text-destructive">
           {error}

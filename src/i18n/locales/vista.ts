@@ -1,10 +1,12 @@
 ﻿import type { LocaleModule } from "../types";
 
 const en = {
+  "vista.signInUnavailable": "Vista Express seller sign-in is currently unavailable. You can still sign in with your Vista Express 360 account.",
+  "vista.retryAvailability": "Check again",
   "vista.title": "Vista Express",
   "vista.sellerConnection": "Seller connection",
   "vista.independentNote":
-    "Optical Shop remains independent. Vista data is identified by source and is not added to your local sales totals.",
+    "Vista Express 360 remains independent. Vista data is identified by source and is not added to your local sales totals.",
   "vista.loadingConnection": "Loading seller connection…",
   "vista.notConfigured":
     "Vista Express is not configured. Complete the local integration setup guide to enable seller sign-in.",
@@ -20,7 +22,7 @@ const en = {
   "vista.disconnectConfirm":
     "Disconnect this seller account? Local records are retained and pending publications must be resolved first.",
   "vista.publishNote":
-    "Publishing reserves your chosen quantity, then transfers it after Vista accepts it. Remaining Optical Shop stock stays local. Remote changes synchronize automatically about every two minutes while the local worker is running; contact imports require explicit review.",
+    "Publishing reserves your chosen quantity, then transfers it after Vista accepts it. Remaining Vista Express 360 stock stays local. Remote changes synchronize automatically about every two minutes while the local worker is running; contact imports require explicit review.",
 
   "vista.recordsTitle": "Vista Express records",
   "vista.products": "Products",
@@ -95,7 +97,7 @@ const en = {
   "vista.addOption": "Add {label}",
   "vista.selectPlaceholder": "Select",
 
-  "vista.sourceLabel": "Source: Optical Shop",
+  "vista.sourceLabel": "Source: Vista Express 360",
   "vista.viewProducts": "View Vista Express products and stock",
   "vista.viewOrders": "View Vista Express orders",
   "vista.viewCustomers": "View Vista Express customers",
@@ -151,10 +153,12 @@ const en = {
 };
 
 const it = {
+  "vista.signInUnavailable": "Accesso venditore Vista Express non disponibile. Puoi comunque accedere con il tuo account Vista Express 360.",
+  "vista.retryAvailability": "Riprova",
   "vista.title": "Vista Express",
   "vista.sellerConnection": "Connessione venditore",
   "vista.independentNote":
-    "Optical Shop resta indipendente. I dati Vista sono identificati per origine e non vengono aggiunti ai tuoi totali di vendita locali.",
+    "Vista Express 360 resta indipendente. I dati Vista sono identificati per origine e non vengono aggiunti ai tuoi totali di vendita locali.",
   "vista.loadingConnection": "Caricamento della connessione venditore…",
   "vista.notConfigured":
     "Vista Express non è configurato. Completa la guida di configurazione dell'integrazione locale per abilitare l'accesso venditore.",
@@ -171,7 +175,7 @@ const it = {
   "vista.disconnectConfirm":
     "Disconnettere questo account venditore? I record locali vengono conservati e le pubblicazioni in sospeso devono prima essere risolte.",
   "vista.publishNote":
-    "La pubblicazione riserva la quantità scelta e la trasferisce solo dopo l'accettazione da parte di Vista. Le scorte rimanenti restano in Optical Shop. Le modifiche remote si sincronizzano ogni due minuti circa mentre il worker locale è attivo; l'importazione dei contatti richiede una revisione esplicita.",
+    "La pubblicazione riserva la quantità scelta e la trasferisce solo dopo l'accettazione da parte di Vista. Le scorte rimanenti restano in Vista Express 360. Le modifiche remote si sincronizzano ogni due minuti circa mentre il worker locale è attivo; l'importazione dei contatti richiede una revisione esplicita.",
 
   "vista.recordsTitle": "Record Vista Express",
   "vista.products": "Prodotti",
@@ -247,7 +251,7 @@ const it = {
   "vista.addOption": "Aggiungi {label}",
   "vista.selectPlaceholder": "Seleziona",
 
-  "vista.sourceLabel": "Origine: Optical Shop",
+  "vista.sourceLabel": "Origine: Vista Express 360",
   "vista.viewProducts": "Vedi prodotti e scorte su Vista Express",
   "vista.viewOrders": "Vedi gli ordini su Vista Express",
   "vista.viewCustomers": "Vedi i clienti su Vista Express",
