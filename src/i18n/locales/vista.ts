@@ -1,6 +1,8 @@
 ﻿import type { LocaleModule } from "../types";
 
 const en = {
+  "vista.workerUnavailable": "Vista background synchronization is not running. Ask your administrator to start the integrations queue worker. Your seller connection is preserved.",
+  "vista.initialSync": "Your first Vista snapshot has not completed. Products, orders and store customers will appear as synchronization progresses.",
   "vista.signInUnavailable": "Vista Express seller sign-in is currently unavailable. You can still sign in with your Vista Express 360 account.",
   "vista.retryAvailability": "Check again",
   "vista.title": "Vista Express",
@@ -153,6 +155,8 @@ const en = {
 };
 
 const it = {
+  "vista.workerUnavailable": "La sincronizzazione Vista non è attiva. Chiedi all’amministratore di avviare il worker della coda integrations. Il collegamento venditore è conservato.",
+  "vista.initialSync": "La prima sincronizzazione Vista non è ancora completata. Prodotti, ordini e clienti del negozio appariranno durante la sincronizzazione.",
   "vista.signInUnavailable": "Accesso venditore Vista Express non disponibile. Puoi comunque accedere con il tuo account Vista Express 360.",
   "vista.retryAvailability": "Riprova",
   "vista.title": "Vista Express",

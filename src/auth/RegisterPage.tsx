@@ -1,3 +1,4 @@
+import AuthShell from "./AuthShell";
 import {
   useMemo,
   useRef,
@@ -20,7 +21,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/i18n";
 import { api, useSession } from "./session";
 import {
@@ -203,12 +203,9 @@ export default function RegisterPage() {
   );
   const values = getValues();
   return (
-    <div className="relative bg-muted min-h-svh flex items-center justify-center px-4 py-8 sm:px-6">
-      <div className="absolute right-4 top-4 z-10">
-        <LanguageToggle />
-      </div>
+    <AuthShell>
       <div className="w-full max-w-2xl space-y-5">
-        <p className="text-center text-lg font-semibold">{t("app.name")}</p>
+
         <Card>
           <CardHeader>
             <CardTitle>
@@ -433,6 +430,6 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AuthShell>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import UploadProcessingStatus from "@/components/UploadProcessingStatus";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Upload, FileSpreadsheet, RefreshCw } from "lucide-react";
 import { api, useSession } from "@/auth/session";
@@ -260,7 +261,7 @@ function ScannedSource({ fileId }: { fileId: number }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (data?.data.scan_status === "pending") {
+    if (["pending", "failed"].includes(data?.data.scan_status ?? "")) {
       const timer = setInterval(reload, 3000);
       return () => clearInterval(timer);
     }
@@ -320,6 +321,7 @@ function ScannedSource({ fileId }: { fileId: number }) {
           {t("imports.fileRejected")}
         </p>
       )}
+      <UploadProcessingStatus />
       <Label htmlFor="import-delimiter">{t("imports.csvSeparator")}</Label>
       <select
         id="import-delimiter"

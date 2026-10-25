@@ -1,3 +1,4 @@
+import AuthShell from "@/auth/AuthShell";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/auth/session";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import LanguageToggle from "@/components/LanguageToggle";
 import { errorText } from "../../../../contracts/operations/shared";
 export default function Invitation() {
   const { t } = useTranslation();
@@ -34,10 +34,9 @@ export default function Invitation() {
     }
   };
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-muted">
+    <AuthShell>
       <Card className="max-w-lg w-full">
         <CardHeader>
-          <LanguageToggle />
           <CardTitle>{t("ops.acceptInvitation")}</CardTitle>
         </CardHeader>
         <CardContent>
@@ -76,6 +75,6 @@ export default function Invitation() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

@@ -1,3 +1,4 @@
+import AuthShell from "./AuthShell";
 import { VistaSignIn } from "@/pages/integrations/VistaAuth";
 import { useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -14,7 +15,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/i18n";
 import { api, useSession } from "./session";
 import {
@@ -126,7 +126,7 @@ export default function AuthPage({ mode }: { mode: Mode }) {
       }
     } catch (e) {
       if (e instanceof ApiError) {
-        setFailure("");
+        setFailure(translateError(e.message));
         for (const [key, messages] of Object.entries(e.errors))
           setError(key as keyof Values, {
             message: translateError(messages[0]),
@@ -160,16 +160,13 @@ export default function AuthPage({ mode }: { mode: Mode }) {
     </div>
   );
   if (mode === "login" && loading)
-    return <p role="status">{t("user.sessionLoading")}</p>;
+    return <AuthShell><p role="status">{t("user.sessionLoading")}</p></AuthShell>;
   if (mode === "login" && user)
     return <Navigate to={safeReturn(params.get("redirectTo"), user?.shop?.status === "active" && user.permissions.includes("operations.read") ? "/dashboard" : "/")} replace />;
   return (
-    <div className="relative bg-muted min-h-svh flex items-center justify-center p-6">
-      <div className="absolute right-4 top-4 z-10">
-        <LanguageToggle />
-      </div>
+    <AuthShell>
       <div className="w-full max-w-md space-y-6">
-        <p className="text-center text-lg font-semibold">{t("app.name")}</p>
+
         <Card>
           <CardHeader className="text-center">
             <CardTitle>{titles[mode]}</CardTitle>
@@ -228,6 +225,6 @@ export default function AuthPage({ mode }: { mode: Mode }) {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AuthShell>
   );
 }

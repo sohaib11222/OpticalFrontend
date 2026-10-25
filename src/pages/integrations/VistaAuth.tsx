@@ -1,3 +1,4 @@
+import AuthShell from "@/auth/AuthShell";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
@@ -122,7 +123,7 @@ export default function VistaCallback() {
   }, [accept, navigate, t, translateError]);
 
   return (
-    <div className="min-h-svh bg-muted flex items-center justify-center p-6">
+    <AuthShell>
       <Card className="max-w-lg">
         <CardHeader>
           <CardTitle>{t("vista.authTitle")}</CardTitle>
@@ -142,6 +143,6 @@ export default function VistaCallback() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

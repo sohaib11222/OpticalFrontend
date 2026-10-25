@@ -1,8 +1,8 @@
+import AuthShell from "./AuthShell";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LanguageToggle } from "@/components/LanguageToggle";
 import { useTranslation } from "@/i18n";
 import { api, useSession } from "./session";
 export default function VerifyPage() {
@@ -38,10 +38,7 @@ export default function VerifyPage() {
     }
   };
   return (
-    <div className="relative min-h-svh flex items-center justify-center p-6">
-      <div className="absolute right-4 top-4 z-10">
-        <LanguageToggle />
-      </div>
+    <AuthShell>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>{t("auth.verify.title")}</CardTitle>
@@ -57,6 +54,6 @@ export default function VerifyPage() {
           </Link>
         </CardContent>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

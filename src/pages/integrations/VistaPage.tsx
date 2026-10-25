@@ -137,6 +137,8 @@ export default function VistaPage() {
                   <p className="text-sm">
                     {t("vista.lastSync", { syncedAt: c.synced_at || t("common.never"), expiresAt: c.expires_at })}
                   </p>
+                  {q.data?.data.processing?.worker_active === false && <p role="alert">{t("vista.workerUnavailable")}</p>}
+                  {!c.synced_at && <p role="status">{t("vista.initialSync")}</p>}
                   {c.last_error && <p role="alert">{translateError(c.last_error)}</p>}
                 </>
               )}
