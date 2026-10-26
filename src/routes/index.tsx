@@ -101,5 +101,5 @@ export const router = createBrowserRouter(
       ],
     },
   ],
-  { basename: "/pulse-ui/" },
+  { basename: import.meta.env.BASE_URL },
 );

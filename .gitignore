@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.deployment-backups/
+www/
 *.local
 
 # Editor directories and files
