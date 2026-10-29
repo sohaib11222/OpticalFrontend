@@ -131,6 +131,7 @@ export default function CustomerDetails() {
           </div>
           <Badge variant="secondary">{t("status." + c.status)}</Badge>
         </div>
+        {c.status === 'active' && user?.permissions.includes('communications.send') && user.permissions.includes('communications.read') && <div className="flex flex-wrap gap-2">{['sms', 'whatsapp', 'email'].map(channel => <Button key={channel} variant="outline" asChild><Link to={'/communications?' + new URLSearchParams({customer: String(c.id), compose: channel})}>{t('ops.' + channel)}</Link></Button>)}</div>}
         {canWrite && (
           <div className="flex gap-2">
             {c.status === "active" && user?.permissions.includes("customers.edit") && (

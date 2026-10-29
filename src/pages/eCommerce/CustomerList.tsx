@@ -37,6 +37,8 @@ export default function CustomerList() {
   const [city, setCity] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const canMessage = !!user?.permissions.includes('communications.send') && user.permissions.includes('communications.read');
   const [sort, setSort] = useState("last_name");
   const query = new URLSearchParams({
     search,
@@ -174,9 +176,16 @@ export default function CustomerList() {
             </p>
           )}
           {loading && <p role="status">{t("customers.loading")}</p>}
+          {canMessage && <div className="flex flex-wrap items-center gap-2">
+            <span>{t('ops.selectedCustomers')}: {selectedIds.length} / 100</span>
+            <Button variant="outline" onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.filter(c => c.status === 'active').map(c => c.id) ?? [])])].slice(0, 100))}>{t('ops.selectPage')}</Button>
+            <Button variant="outline" onClick={() => setSelectedIds([])}>{t('ops.clearSelection')}</Button>
+            {['sms', 'email'].map(channel => <Button key={channel} disabled={!selectedIds.length} onClick={() => navigate('/communications?' + new URLSearchParams({compose: channel, customers: selectedIds.join(',')}))}>{t(channel === 'sms' ? 'ops.bulkSms' : 'ops.bulkEmail')}</Button>)}
+          </div>}
           <Table>
             <TableHeader>
               <TableRow>
+                {canMessage && <TableHead>{t('ops.selectCustomer')}</TableHead>}
                 {[
                   t("customers.colCustomer"),
                   t("customers.colContact"),
@@ -192,6 +201,7 @@ export default function CustomerList() {
             <TableBody>
               {data?.data.map((c) => (
                 <TableRow key={c.id}>
+                  {canMessage && <TableCell><input type="checkbox" aria-label={t('ops.selectCustomer') + ' ' + c.first_name + ' ' + c.last_name} checked={selectedIds.includes(c.id)} disabled={c.status !== 'active' || (!selectedIds.includes(c.id) && selectedIds.length >= 100)} onChange={e => setSelectedIds(e.target.checked ? [...selectedIds, c.id] : selectedIds.filter(id => id !== c.id))} /></TableCell>}
                   <TableCell className="font-medium">
                     <Link className="hover:underline" to={"/customers/" + c.id}>
                       {c.first_name} {c.last_name}
@@ -221,6 +231,7 @@ export default function CustomerList() {
                         {t("customers.view")}
                       </Link>
                     </Button>
+                    {canMessage && c.status === 'active' && <div className="flex flex-wrap gap-1 mt-2">{['sms', 'whatsapp', 'email'].map(channel => <Button key={channel} variant="outline" size="sm" disabled={channel === 'email' ? !c.email : !c.phone} onClick={() => navigate('/communications?' + new URLSearchParams({customer: String(c.id), compose: channel}))}>{t('ops.' + channel)}</Button>)}</div>}
                   </TableCell>
                 </TableRow>
               ))}

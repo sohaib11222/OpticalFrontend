@@ -8,7 +8,7 @@ import type { SessionUser } from "../../../../contracts/session";
 import { useTranslation } from "@/i18n";
 
 export function VistaSignIn({ connect = false }: { connect?: boolean }) {
-  const { t, translateError } = useTranslation();
+  const { t, translateError, language } = useTranslation();
   const [enabled, setEnabled] = useState(false);
   const [checking, setChecking] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -49,6 +49,7 @@ export function VistaSignIn({ connect = false }: { connect?: boolean }) {
           void api
             .post<{ data: { authorize_url: string } }>("/auth/vista/start", {
               mode: connect ? "connect" : "login",
+              locale: language,
             })
             .then((r) => window.location.assign(r.data.authorize_url))
             .catch((e) => {
