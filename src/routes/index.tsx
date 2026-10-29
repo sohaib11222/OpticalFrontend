@@ -10,6 +10,7 @@ import OrderForm from "@/pages/eCommerce/OrderForm";
 import OrderSheet from "@/pages/eCommerce/OrderSheet";
 import ProductList from "@/pages/eCommerce/ProductList";
 import ProductGrid from "@/pages/eCommerce/ProductGrid";
+import VistaPublishPage from "@/pages/integrations/VistaPublishPage";
 import ProductDetails from "@/pages/eCommerce/ProductDetails";
 import AddProduct from "@/pages/eCommerce/AddProduct";
 import CategoryList from "@/pages/eCommerce/CategoryList";
@@ -75,6 +76,7 @@ export const router = createBrowserRouter(
                 { path: "/products/grid", element: <ProductGrid /> },
                 { path: "/products/new", element: <AddProduct /> },
                 { path: "/products/:id", element: <ProductDetails /> },
+                { path: "/products/:id/vista", element: <VistaPublishPage /> },
                 { path: "/products/:id/edit", element: <AddProduct /> },
                 { path: "/product-categories", element: <CategoryList /> },
                 { path: "/integrations/vista", element: <VistaPage /> },
