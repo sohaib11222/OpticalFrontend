@@ -9,7 +9,7 @@ export default function VistaPublishPage() {
   const { t } = useTranslation();
   const q = useApiResource<{ data: Product }>("/products/" + id);
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6">
       <Button asChild variant="outline">
         <Link to={"/products/" + id}>{t("nav.products")}</Link>
       </Button>

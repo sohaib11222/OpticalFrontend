@@ -1,4 +1,4 @@
-import { VistaSpecialField, vistaSpecialTypes } from "../../../../contracts/VistaEditor";
+import { VistaColorVariations, VistaSizeRows, VistaPackRows, VistaSpecialField, vistaSpecialTypes } from "../../../../contracts/VistaEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { VistaField } from "../../../../contracts/vista";
@@ -21,12 +21,15 @@ export function VistaFields({
     onChange({ ...values, [key]: value });
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 [&>fieldset]:col-span-full [&>section]:col-span-full">
       {fields.filter(field => !field.hidden).map((field) => {
         const id = prefix + "-" + field.key;
         const value = values[field.key];
 
         if (vistaSpecialTypes.includes(field.type)) return <VistaSpecialField key={id} field={field} value={value} onChange={v => set(field.key, v)} />;
+        if (field.type === 'rows' && field.key === 'sizes') return <VistaSizeRows key={id} field={field} value={value} onChange={v=>set(field.key,v)} />;
+        if (field.type === 'rows' && field.key === 'contact_lens_packs') return <VistaPackRows key={id} field={field} value={value} onChange={v=>set(field.key,v)} render={(row,change)=><VistaFields fields={field.fields ?? []} values={row} onChange={change} prefix={id+'-'+row.option_key} />} />;
+        if (field.type === "rows" && field.key === "variants") return <VistaColorVariations key={id} field={field} value={value} onChange={v => set(field.key, v)} render={(row, change) => <VistaFields fields={field.fields ?? []} values={row} onChange={change} prefix={id + '-dialog'} />} />;
         if (field.type === "rows") {
           const rows = (Array.isArray(value) ? value : []) as VistaValues[];
           return (
@@ -134,7 +137,7 @@ export function VistaFields({
           );
 
         return (
-          <div key={id} className="space-y-2">
+          <div key={id} className={`space-y-2 ${['textarea', 'list'].includes(field.type) ? 'col-span-full' : ''}`}>
             <label htmlFor={id}>
               {field.label}
               {field.required ? " *" : ""}
@@ -155,18 +158,19 @@ export function VistaFields({
                   </option>
                 ))}
               </select>
-            ) : field.type === "textarea" ? (
+            ) : ['textarea', 'list'].includes(field.type) ? (
               <textarea
                 id={id}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 required={field.required}
                 maxLength={field.maxLength}
-                value={String(value ?? "")}
+                value={Array.isArray(value) ? value.join(', ') : String(value ?? "")}
                 onChange={(e) => set(field.key, e.target.value)}
               />
             ) : (
               <Input
                 id={id}
+                readOnly={field.key === 'stock_quantity' && Array.isArray(values.sizes) && values.sizes.length > 0}
                 type={
                   ["number", "date"].includes(field.type) ? field.type : "text"
                 }

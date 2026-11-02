@@ -346,7 +346,9 @@ export default function VistaPublish({
                   )}
                   {(!contact || step === 0) && (
                     <>
-                      <VistaCommonSections
+                      <VistaCommonSections section="basic" fields={meta?.data.common_fields ?? []} render={fields => <VistaFields fields={fields} values={values} onChange={setValues} />} />
+                      {!contact && <VistaFields fields={meta.data.categories.find(c => c.id === Number(values.category_id))?.fields?.filter(f => f.key === "variants") ?? []} values={values} onChange={setValues} />}
+                      <VistaCommonSections section="pricing"
                         fields={meta?.data.common_fields ?? []}
                         render={(fields) => (
                           <VistaFields
@@ -382,12 +384,15 @@ export default function VistaPublish({
                       meta?.data.categories
                         .find((c) => c.id === Number(values.category_id))
                         ?.fields?.filter(
-                          (f) => !contact || vistaStepForField(f.key) === step,
+                          (f) => contact ? vistaStepForField(f.key) === step : f.key !== "variants",
                         ) ?? []
                     }
                     values={values}
                     onChange={setValues}
                   />
+                  {(!contact || step === 0) && (
+                      <VistaCommonSections section="listing" fields={meta?.data.common_fields ?? []} render={fields => <VistaFields fields={fields} values={values} onChange={setValues} />} />
+                  )}
                   {vistaAllocatedTotal(values) !== null && (
                     <p role="status">
                       {t("vista.optionAllocationTotal", {
