@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { SessionUser } from "../../../../contracts/session";
+import { ApiError, type SessionUser } from "../../../../contracts/session";
 import { useTranslation } from "@/i18n";
 
 export function VistaSignIn({ connect = false }: { connect?: boolean }) {
@@ -99,6 +99,7 @@ export default function VistaCallback() {
       ? ""
       : t("vista.authIncomplete");
   });
+  const [renewalUrl, setRenewalUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (started.current) return;
@@ -117,6 +118,20 @@ export default function VistaCallback() {
         navigate("/integrations/vista", { replace: true });
       })
       .catch((e) => {
+        if (e instanceof ApiError && e.code === "vista360_subscription_required") {
+          const details = e.data as {
+            entitlement?: { renewal_url?: unknown };
+            renewal_url?: unknown;
+          } | undefined;
+          const candidate = details?.entitlement?.renewal_url ?? details?.renewal_url;
+          setRenewalUrl(
+            typeof candidate === "string" && /^https:\/\//.test(candidate)
+              ? candidate
+              : null,
+          );
+          setError(t("vista.subscriptionRequired"));
+          return;
+        }
         setError(
           e instanceof Error ? translateError(e.message) : t("vista.authError"),
         );
@@ -138,6 +153,11 @@ export default function VistaCallback() {
               <Button asChild variant="outline">
                 <Link to="/auth/login">{t("vista.returnToSignIn")}</Link>
               </Button>
+              {renewalUrl && (
+                <Button asChild className="mt-3">
+                  <a href={renewalUrl}>{t("vista.manageSubscription")}</a>
+                </Button>
+              )}
             </>
           ) : (
             <p role="status">{t("vista.authCompleting")}</p>

@@ -58,6 +58,8 @@ const en = {
   "vista.authIncomplete":
     "The authorization response is incomplete. Start again.",
   "vista.authError": "Vista authorization failed.",
+  "vista.subscriptionRequired": "This Vista Express seller needs an active Vista Express 360 subscription before the CRM can be opened.",
+  "vista.manageSubscription": "View or renew Vista Express 360",
   "vista.returnToSignIn": "Return to sign in",
 
   "vista.publishTitle": "Vista Express publication",
@@ -214,6 +216,8 @@ const it = {
   "vista.authIncomplete":
     "La risposta di autorizzazione è incompleta. Ricomincia.",
   "vista.authError": "Autorizzazione Vista non riuscita.",
+  "vista.subscriptionRequired": "Questo venditore Vista Express necessita di un abbonamento Vista Express 360 attivo prima di poter aprire il CRM.",
+  "vista.manageSubscription": "Visualizza o rinnova Vista Express 360",
   "vista.returnToSignIn": "Torna all'accesso",
 
   "vista.publishTitle": "Pubblicazione su Vista Express",
