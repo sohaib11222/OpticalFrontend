@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { api, useSession } from "@/auth/session";
 import { useTranslation } from "@/i18n";
 import { useApiResource } from "@/hooks/use-api-resource";
@@ -31,6 +32,8 @@ import { ApiError } from "../../../../contracts/session";
 export default function CategoryList() {
   const { t, translateError } = useTranslation();
   const { user } = useSession();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("all");
@@ -38,6 +41,11 @@ export default function CategoryList() {
   const q = new URLSearchParams({ search, page: String(page) });
   if (status !== "all") q.set("status", status);
   const r = useApiResource<Page<Category>>("/product-categories?" + q);
+  useEffect(() => {
+    if (params.get("notice") !== "category-required") return;
+    toast.info(t("products.categoryRequiredBeforeProduct"));
+    navigate("/product-categories", { replace: true });
+  }, [navigate, params, t]);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between gap-3">
@@ -166,7 +174,6 @@ function CategoryForm({
       status: category?.status ?? "active",
     },
   });
-  const [error, setMessage] = useState("");
   return (
     <Dialog
       open
@@ -188,7 +195,6 @@ function CategoryForm({
         <form
           className="space-y-4"
           onSubmit={handleSubmit(async (d) => {
-            setMessage("");
             try {
               await api.request(
                 "/product-categories" + (category ? "/" + category.id : ""),
@@ -200,9 +206,14 @@ function CategoryForm({
                   }),
                 },
               );
+              toast.success(
+                category
+                  ? t("products.categoryUpdated")
+                  : t("products.categoryCreated"),
+              );
               saved();
             } catch (e) {
-              setMessage(
+              toast.error(
                 e instanceof Error
                   ? translateError(e.message)
                   : t("products.unableToSaveCategory"),
@@ -213,7 +224,7 @@ function CategoryForm({
                     message: translateError(v[0]),
                   });
             }
-          })}
+          }, () => toast.error(t("products.nameRequired")))}
         >
           <Label htmlFor="category-name">
             {t("products.categoryName")}
@@ -243,11 +254,6 @@ function CategoryForm({
             <option value="active">{t("status.active")}</option>
             <option value="archived">{t("status.archived")}</option>
           </select>
-          {error && (
-            <p role="alert" className="text-destructive">
-              {error}
-            </p>
-          )}
           <Button disabled={isSubmitting} type="submit">
             {t("products.saveCategory")}
           </Button>

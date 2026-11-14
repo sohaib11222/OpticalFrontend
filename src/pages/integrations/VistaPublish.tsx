@@ -28,8 +28,10 @@ import {
   vistaSubcategories,
   publicationValues,
   vistaAllocatedTotal,
+  vistaContactLensIsColored,
   type VistaValues,
 } from "../../../../contracts/vista-form";
+import type { VistaField } from "../../../../contracts/vista";
 import { useTranslation } from "@/i18n";
 
 export default function VistaPublish({
@@ -55,6 +57,31 @@ export default function VistaPublish({
   const [quantity, setQuantity] = useState(0);
   const [step, setStep] = useState(0);
   const contact = values.product_type === "contact_lens";
+  const coloredContact = Boolean(
+    contact && meta && vistaContactLensIsColored(values, meta),
+  );
+  const allocatedTotal = vistaAllocatedTotal(values);
+  const quantityForPublication = allocatedTotal ?? quantity;
+  const categoryFields =
+    meta?.data.categories.find((c) => c.id === Number(values.category_id))
+      ?.fields ?? [];
+  const visibleCategoryFields: VistaField[] = (!contact || coloredContact
+    ? categoryFields
+    : categoryFields
+        .filter(
+          (field) =>
+            !["variants", "contact_lens_colour_stock"].includes(field.key),
+        )
+        .map((field) =>
+          field.key === "contact_lens_packs"
+            ? {
+                ...field,
+                fields: field.fields?.filter(
+                  (child) => child.key !== "variant_keys",
+                ),
+              }
+            : field,
+        )) as VistaField[];
   const [key, setKey] = useState(crypto.randomUUID());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -287,7 +314,7 @@ export default function VistaPublish({
                     void api
                       .post("/products/" + product.id + "/vista", {
                         version: product.version,
-                        quantity,
+                        quantity: quantityForPublication,
                         creation_key: key,
                         expected_version: pub?.remote_version,
                         mapping: publicationValues(meta!, values),
@@ -342,12 +369,12 @@ export default function VistaPublish({
                       />
                     )}
                   {contact && (
-                    <VistaStepNavigation step={step} onChange={setStep} />
+                    <VistaStepNavigation step={step} onChange={setStep} showActions={false} />
                   )}
                   {(!contact || step === 0) && (
                     <>
                       <VistaCommonSections section="basic" fields={meta?.data.common_fields ?? []} render={fields => <VistaFields fields={fields} values={values} onChange={setValues} />} />
-                      {!contact && <VistaFields fields={meta.data.categories.find(c => c.id === Number(values.category_id))?.fields?.filter(f => f.key === "variants") ?? []} values={values} onChange={setValues} />}
+                      {!contact && <VistaFields fields={visibleCategoryFields.filter(f => f.key === "variants")} values={values} onChange={setValues} />}
                       <VistaCommonSections section="pricing"
                         fields={meta?.data.common_fields ?? []}
                         render={(fields) => (
@@ -358,18 +385,37 @@ export default function VistaPublish({
                           />
                         )}
                       />
-                      <Label htmlFor="vista-quantity">
-                        {t("vista.quantityLabel")}
-                      </Label>
-                      <Input
-                        id="vista-quantity"
-                        type="number"
-                        required
-                        min={0}
-                        max={product.balance.available}
-                        value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                      />
+                      {allocatedTotal === null ? (
+                        <>
+                          <Label htmlFor="vista-quantity">
+                            {t("vista.quantityLabel")}
+                          </Label>
+                          <Input
+                            id="vista-quantity"
+                            type="number"
+                            required
+                            min={0}
+                            max={product.balance.available}
+                            value={quantity}
+                            onChange={(e) => setQuantity(Number(e.target.value))}
+                          />
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                          <Label htmlFor="vista-total-stock">
+                            {t("vista.totalStockAutomatic")}
+                          </Label>
+                          <Input
+                            id="vista-total-stock"
+                            readOnly
+                            value={allocatedTotal}
+                            aria-describedby="vista-total-stock-help"
+                          />
+                          <p id="vista-total-stock-help" className="mt-2 text-sm text-muted-foreground">
+                            {t("vista.totalStockAutomaticHelp")}
+                          </p>
+                        </div>
+                      )}
                       <VistaImagePicker
                         label={t("ops.vista.photos")}
                         value={values.gallery_image_ids}
@@ -380,26 +426,29 @@ export default function VistaPublish({
                     </>
                   )}
                   <VistaFields
-                    fields={
-                      meta?.data.categories
-                        .find((c) => c.id === Number(values.category_id))
-                        ?.fields?.filter(
-                          (f) => contact ? vistaStepForField(f.key) === step : f.key !== "variants",
-                        ) ?? []
-                    }
+                    fields={visibleCategoryFields.filter(
+                      (f) =>
+                        contact
+                          ? vistaStepForField(f.key) === step
+                          : f.key !== "variants",
+                    )}
                     values={values}
                     onChange={setValues}
                   />
                   {(!contact || step === 0) && (
                       <VistaCommonSections section="listing" fields={meta?.data.common_fields ?? []} render={fields => <VistaFields fields={fields} values={values} onChange={setValues} />} />
                   )}
-                  {vistaAllocatedTotal(values) !== null && (
-                    <p role="status">
-                      {t("vista.optionAllocationTotal", {
-                        total: vistaAllocatedTotal(values) ?? 0,
-                        quantity,
-                      })}
+                  {allocatedTotal !== null && allocatedTotal > product.balance.available && (
+                    <p role="alert" className="text-destructive">
+                      {t("vista.totalStockExceedsAvailable", { available: product.balance.available })}
                     </p>
+                  )}
+                  {contact && step < 2 && (
+                    <VistaStepNavigation
+                      step={step}
+                      onChange={setStep}
+                      showProgress={false}
+                    />
                   )}
                   {error && (
                     <p role="alert" className="text-destructive">
@@ -415,8 +464,7 @@ export default function VistaPublish({
                       ) ||
                       !values.product_type ||
                       !values.category_id ||
-                      (vistaAllocatedTotal(values) !== null &&
-                        vistaAllocatedTotal(values) !== quantity)
+                      quantityForPublication > product.balance.available
                     }
                   >
                     {busy ? t("vista.queueing") : t("vista.publishBtn")}

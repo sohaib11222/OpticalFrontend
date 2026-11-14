@@ -1,5 +1,5 @@
 import OperationsWorkspace from "@/pages/operations/OperationsWorkspace";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { CategoryPicker } from "./catalog-shared";
-import { decimal, type Product } from "../../../../contracts/commerce";
+import { decimal, type Category, type Product } from "../../../../contracts/commerce";
 import { ApiError } from "../../../../contracts/session";
+import type { Page } from "../../../../contracts/customers";
 type Values = {
   name: string;
   sku: string;
@@ -48,7 +50,36 @@ function ProductEditor({ product }: { product?: Product }) {
   const { user } = useSession();
   const navigate = useNavigate();
   const [key] = useState(() => crypto.randomUUID());
-  const [error, setMessage] = useState("");
+  const [checkingCategories, setCheckingCategories] = useState(!product);
+  useEffect(() => {
+    if (product) {
+      setCheckingCategories(false);
+      return;
+    }
+    let current = true;
+    void api
+      .request<Page<Category>>("/product-categories?status=active&page=1")
+      .then((categories) => {
+        if (!current) return;
+        if (!categories.data.length) {
+          navigate("/product-categories?notice=category-required", { replace: true });
+          return;
+        }
+        setCheckingCategories(false);
+      })
+      .catch((cause) => {
+        if (!current) return;
+        setCheckingCategories(false);
+        toast.error(
+          cause instanceof Error
+            ? translateError(cause.message)
+            : t("products.categoryCheckFailed"),
+        );
+      });
+    return () => {
+      current = false;
+    };
+  }, [navigate, product, t, translateError]);
   const form = useForm<Values>({
     defaultValues: {
       name: product?.name ?? "",
@@ -82,6 +113,8 @@ function ProductEditor({ product }: { product?: Product }) {
         </Button>
       </div>
     );
+  if (checkingCategories)
+    return <p role="status">{t("products.checkingCategories")}</p>;
   const field = (
     name: keyof Values,
     label: string,
@@ -121,7 +154,6 @@ function ProductEditor({ product }: { product?: Product }) {
     <form
       className="space-y-6"
       onSubmit={form.handleSubmit(async (values) => {
-        setMessage("");
         try {
           const { initial_quantity, ...v } = values;
           const r = await api.request<{ data: Product }>(
@@ -136,9 +168,12 @@ function ProductEditor({ product }: { product?: Product }) {
               }),
             },
           );
+          toast.success(
+            product ? t("products.productUpdated") : t("products.productCreated"),
+          );
           navigate("/products/" + r.data.id);
         } catch (e) {
-          setMessage(
+          toast.error(
             e instanceof Error
               ? translateError(e.message)
               : t("products.unableToSaveProduct"),
@@ -149,7 +184,7 @@ function ProductEditor({ product }: { product?: Product }) {
                 message: translateError(v[0]),
               });
         }
-      })}
+      }, () => toast.error(t("products.completeHighlightedFields")))}
     >
       <div className="flex justify-between flex-wrap gap-4">
         <div>
@@ -172,12 +207,6 @@ function ProductEditor({ product }: { product?: Product }) {
           </Button>
         </div>
       </div>
-      {error && (
-        <p role="alert" className="text-destructive">
-          {error}{" "}
-          {error.includes("changed") && t("products.entriesRetainedNote")}
-        </p>
-      )}
       {!currency && (
         <p role="alert">
           {t("products.currencySetStart")}{" "}

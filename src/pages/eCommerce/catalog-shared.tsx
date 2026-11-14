@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "@/i18n";
+import { useState } from "react";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -148,29 +149,57 @@ export function CategoryPicker({
           setPage(1);
         }}
       />
-      <select
+      <div
         id="category-picker"
-        className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-        value={value ?? ""}
-        onChange={(e) =>
-          onChange(e.target.value ? Number(e.target.value) : null)
-        }
+        className="max-h-48 overflow-y-auto rounded-md border border-input bg-background p-1"
+        role="listbox"
+        aria-label={t("products.category")}
       >
-        <option value="">
-          {all ? t("products.allCategories") : t("products.chooseCategory")}
-        </option>
+        {all && (
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === null}
+            className={`block w-full rounded px-3 py-2 text-left text-sm transition ${
+              value === null ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+            }`}
+            onClick={() => onChange(null)}
+          >
+            {t("products.allCategories")}
+          </button>
+        )}
         {value && !r.data?.data.some((c) => c.id === value) && (
-          <option value={value}>
+          <button
+            type="button"
+            role="option"
+            aria-selected
+            className="block w-full rounded bg-primary px-3 py-2 text-left text-sm text-primary-foreground"
+            onClick={() => onChange(value)}
+          >
             {initial?.name ?? t("products.categoryNumber", { id: value })}
-          </option>
+          </button>
         )}
         {r.data?.data.map((c) => (
-          <option value={c.id} key={c.id}>
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === c.id}
+            className={`block w-full rounded px-3 py-2 text-left text-sm transition ${
+              value === c.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+            }`}
+            key={c.id}
+            onClick={() => onChange(c.id)}
+          >
             {c.name}
             {c.status === "archived" ? t("products.archivedSuffix") : ""}
-          </option>
+          </button>
         ))}
-      </select>
+        {!r.loading && !r.data?.data.length && (
+          <p className="px-3 py-2 text-sm text-muted-foreground">
+            {t("common.noResults")}
+          </p>
+        )}
+      </div>
       {r.error && <p role="alert">{translateError(r.error)}</p>}
       {(r.data?.last_page ?? 1) > 1 && (
         <Paging

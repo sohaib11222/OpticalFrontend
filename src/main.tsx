@@ -27,6 +27,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </TranslationProvider>
       </UIThemeProvider>
     </ThemeProvider>
-    <Toaster position="top-right" richColors closeButton />
+    <Toaster position="bottom-left" richColors closeButton />
   </React.StrictMode>,
 );

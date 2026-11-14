@@ -1,6 +1,5 @@
 import OperationsWorkspace from "@/pages/operations/OperationsWorkspace";
 import VistaPublish from "@/pages/integrations/VistaPublish";
-import UploadProcessingStatus from "@/components/UploadProcessingStatus";
 import { useEffect, useState, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
@@ -11,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { Choice, ProductPhoto } from "./catalog-shared";
 import ProductStock from "./ProductStock";
 import { money, type Product } from "../../../../contracts/commerce";
@@ -20,11 +20,16 @@ export default function ProductDetails() {
   const { id } = useParams();
   const r = useApiResource<{ data: Product }>("/products/" + id);
   const { user } = useSession();
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [target, setTarget] = useState("active");
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadKey, setUploadKey] = useState(() => crypto.randomUUID());
+  const [uploads, setUploads] = useState<
+    Array<{
+      id: string;
+      name: string;
+      state: "uploading" | "ready" | "failed";
+      message?: string;
+    }>
+  >([]);
   const p = r.data?.data;
   const pending = p?.images?.some(
     (i) => i.scan_status === "pending" && !i.archived_at,
@@ -36,18 +41,81 @@ export default function ProductDetails() {
   }, [pending, r.reload]);
   const mutate = async (path: string, body?: object) => {
     setBusy(true);
-    setError("");
     try {
       await api.request(path, { method: "PATCH", body: JSON.stringify(body) });
-      r.reload();
+      await r.reload();
+      toast.success(t("products.actionSucceeded"));
     } catch (e) {
-      setError(
+      toast.error(
         e instanceof Error
           ? translateError(e.message)
           : t("products.actionFailed"),
       );
     } finally {
       setBusy(false);
+    }
+  };
+  const uploadPhotographs = async (files: FileList | null) => {
+    const selected = Array.from(files ?? []);
+    if (!selected.length) return;
+
+    const records = selected.map((item) => ({
+      id: crypto.randomUUID(),
+      name: item.name,
+      state: "uploading" as const,
+    }));
+    setUploads((current) => [...current, ...records]);
+    setBusy(true);
+
+    const results = await Promise.all(
+      selected.map(async (item, index) => {
+        const record = records[index];
+        const body = new FormData();
+        body.append("file", item);
+        body.append("upload_key", crypto.randomUUID());
+        try {
+          const result = await api.request<{ data: { scan_status: string } }>(
+            "/products/" + p!.id + "/images",
+            { method: "POST", body },
+          );
+          setUploads((current) =>
+            current.map((entry) =>
+              entry.id === record.id
+                ? { ...entry, state: "ready", message: result.data.scan_status }
+                : entry,
+            ),
+          );
+          return true;
+        } catch (cause) {
+          const message =
+            cause instanceof Error
+              ? translateError(cause.message)
+              : t("products.uploadFailed");
+          setUploads((current) =>
+            current.map((entry) =>
+              entry.id === record.id
+                ? { ...entry, state: "failed", message }
+                : entry,
+            ),
+          );
+          return false;
+        }
+      }),
+    );
+
+    if (photoInput.current) photoInput.current.value = "";
+    setBusy(false);
+    void r.reload();
+    const complete = results.filter(Boolean).length;
+    if (complete) {
+      toast.success(
+        complete === 1
+          ? t("products.photoUploadedReady")
+          : t("products.photosUploadedReady", { count: complete }),
+      );
+    }
+    if (complete !== selected.length) {
+      toast.error(t("products.somePhotosFailed"));
     }
   };
   if (!p)
@@ -68,7 +136,6 @@ export default function ProductDetails() {
   const canArchive = write && user?.permissions.includes("products.archive");
   return (
     <div className="space-y-6">
-      <UploadProcessingStatus />
       {user?.permissions.includes("integrations.read") && (
         <VistaPublish product={p} refresh={r.reload} />
       )}
@@ -99,9 +166,9 @@ export default function ProductDetails() {
           )}
         </div>
       </div>
-      {(error || r.error) && (
+      {r.error && (
         <p role="alert" className="text-destructive">
-          {error || translateError(r.error)}
+          {translateError(r.error)}
         </p>
       )}
       <OperationsWorkspace module="variations" product={p} />
@@ -148,36 +215,7 @@ export default function ProductDetails() {
             </CardHeader>
             <CardContent className="space-y-4">
               {canEdit && p.status !== "archived" && (
-                <form
-                  className="space-y-3 rounded-md border border-dashed p-5"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!file) return;
-                    setBusy(true);
-                    setError("");
-                    const data = new FormData();
-                    data.append("file", file);
-                    data.append("upload_key", uploadKey);
-                    try {
-                      await api.request("/products/" + p.id + "/images", {
-                        method: "POST",
-                        body: data,
-                      });
-                      setFile(null);
-                      if (photoInput.current) photoInput.current.value = "";
-                      setUploadKey(crypto.randomUUID());
-                      r.reload();
-                    } catch (ex) {
-                      setError(
-                        ex instanceof Error
-                          ? translateError(ex.message)
-                          : t("products.uploadFailed"),
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
+                <div className="space-y-3 rounded-md border border-dashed p-5">
                   <Label htmlFor="product-photo">
                     {t("products.uploadPhotograph")}
                   </Label>
@@ -185,19 +223,39 @@ export default function ProductDetails() {
                     ref={photoInput}
                     id="product-photo"
                     type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={(e) => {
-                      setFile(e.target.files?.[0] ?? null);
-                      setUploadKey(crypto.randomUUID());
-                    }}
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    disabled={busy}
+                    onChange={(e) => void uploadPhotographs(e.target.files)}
                   />
                   <p className="text-sm text-muted-foreground">
-                    {t("products.photoGuidance")}
+                    {t("products.photoGuidanceAuto")}
                   </p>
-                  <Button type="submit" disabled={busy || !file}>
-                    {t("products.uploadPhoto")}
-                  </Button>
-                </form>
+                  {uploads.length > 0 && (
+                    <ul className="space-y-2 rounded-md bg-muted/40 p-3 text-sm" aria-live="polite">
+                      {uploads.slice(-12).map((upload) => (
+                        <li className="flex items-center justify-between gap-3" key={upload.id}>
+                          <span className="truncate">{upload.name}</span>
+                          <span
+                            className={
+                              upload.state === "failed"
+                                ? "text-destructive"
+                                : upload.state === "ready"
+                                  ? "text-emerald-700"
+                                  : "text-muted-foreground"
+                            }
+                          >
+                            {upload.state === "uploading"
+                              ? t("products.uploadingAndScanning")
+                              : upload.state === "ready"
+                                ? t("products.uploadReady")
+                                : upload.message}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
                 {p.images
@@ -259,14 +317,16 @@ export default function ProductDetails() {
                                 disabled={busy}
                                 onClick={async () => {
                                   setBusy(true);
-                                  setError("");
                                   try {
                                     await api.post(
                                       "/catalog-images/" + i.id + "/retry",
                                     );
-                                    r.reload();
+                                    await r.reload();
+                                    toast.success(
+                                      t("products.photoRetrySucceeded"),
+                                    );
                                   } catch (e) {
-                                    setError(
+                                    toast.error(
                                       e instanceof Error
                                         ? translateError(e.message)
                                         : t("products.retryFailed"),

@@ -7,6 +7,10 @@ const en: Record<string, string> = {
   "products.findCategory": "Find a category",
   "products.allCategories": "All categories",
   "products.chooseCategory": "Choose a category",
+  "products.categoryRequiredBeforeProduct":
+    "Please create a category first before adding your product.",
+  "products.categoryCheckFailed": "Unable to check product categories. Please try again.",
+  "products.checkingCategories": "Checking your product categories…",
   "products.categoryNumber": "Category #{id}",
   "products.archivedSuffix": " (archived)",
 
@@ -61,6 +65,13 @@ const en: Record<string, string> = {
   "products.uploadPhotograph": "Upload photograph",
   "products.photoGuidance":
     "PNG or JPEG · up to 10 MB and 25 megapixels · eight current photos. Photographs appear after security processing.",
+  "products.photoGuidanceAuto":
+    "Select one or more PNG, JPEG or WebP photographs. Uploading and safety processing start automatically.",
+  "products.uploadingAndScanning": "Uploading and checking…",
+  "products.uploadReady": "Ready to use",
+  "products.photoUploadedReady": "Product photograph uploaded and ready to use.",
+  "products.photosUploadedReady": "{count} product photographs uploaded and ready to use.",
+  "products.somePhotosFailed": "Some photographs could not be uploaded. Check the file requirements and retry only those files.",
   "products.uploadPhoto": "Upload photo",
   "products.photoStatus": "Photo {status}",
   "products.primaryPhoto": "Primary photo",
@@ -76,6 +87,8 @@ const en: Record<string, string> = {
   "products.activeNeedsDescriptionPhoto":
     "Active products need a description and a processed photograph. Products with reserved stock cannot be archived.",
   "products.actionFailed": "Action failed",
+  "products.actionSucceeded": "Changes saved successfully.",
+  "products.photoRetrySucceeded": "Image processing completed successfully.",
   "products.uploadFailed": "Upload failed",
   "products.retryFailed": "Retry failed",
 
@@ -120,6 +133,9 @@ const en: Record<string, string> = {
   "products.maximumValue": "Maximum 1,000,000",
   "products.activeNeedsDescription": "Active products need a description",
   "products.unableToSaveProduct": "Unable to save product.",
+  "products.productCreated": "Product created successfully.",
+  "products.productUpdated": "Product updated successfully.",
+  "products.completeHighlightedFields": "Please complete the highlighted fields before saving the product.",
 
   "products.stockHistory": "Stock history",
   "products.receiveStock": "Receive stock",
@@ -189,6 +205,8 @@ const en: Record<string, string> = {
   "products.saveCategory": "Save category",
   "products.nameRequired": "Name is required",
   "products.unableToSaveCategory": "Unable to save category",
+  "products.categoryCreated": "Category created successfully.",
+  "products.categoryUpdated": "Category updated successfully.",
 
   "products.availableEquals": "Available = on hand − reserved",
   "products.stockBalances": "Stock balances",
@@ -210,6 +228,10 @@ const it: Record<string, string> = {
   "products.findCategory": "Trova una categoria",
   "products.allCategories": "Tutte le categorie",
   "products.chooseCategory": "Scegli una categoria",
+  "products.categoryRequiredBeforeProduct":
+    "Crea prima una categoria prima di aggiungere il prodotto.",
+  "products.categoryCheckFailed": "Impossibile controllare le categorie prodotto. Riprova.",
+  "products.checkingCategories": "Controllo delle categorie prodotto…",
   "products.categoryNumber": "Categoria n. {id}",
   "products.archivedSuffix": " (archiviata)",
 
@@ -265,6 +287,13 @@ const it: Record<string, string> = {
   "products.uploadPhotograph": "Carica fotografia",
   "products.photoGuidance":
     "PNG o JPEG · fino a 10 MB e 25 megapixel · otto foto attuali. Le fotografie compaiono dopo la verifica di sicurezza.",
+  "products.photoGuidanceAuto":
+    "Seleziona una o più fotografie PNG, JPEG o WebP. Il caricamento e il controllo di sicurezza iniziano automaticamente.",
+  "products.uploadingAndScanning": "Caricamento e verifica…",
+  "products.uploadReady": "Pronta all'uso",
+  "products.photoUploadedReady": "Fotografia del prodotto caricata e pronta all'uso.",
+  "products.photosUploadedReady": "{count} fotografie del prodotto caricate e pronte all'uso.",
+  "products.somePhotosFailed": "Alcune fotografie non sono state caricate. Controlla i requisiti del file e riprova solo quei file.",
   "products.uploadPhoto": "Carica foto",
   "products.photoStatus": "Foto {status}",
   "products.primaryPhoto": "Foto principale",
@@ -280,6 +309,8 @@ const it: Record<string, string> = {
   "products.activeNeedsDescriptionPhoto":
     "I prodotti attivi richiedono una descrizione e una fotografia elaborata. I prodotti con scorte riservate non possono essere archiviati.",
   "products.actionFailed": "Operazione non riuscita",
+  "products.actionSucceeded": "Modifiche salvate correttamente.",
+  "products.photoRetrySucceeded": "L'elaborazione dell'immagine è stata completata correttamente.",
   "products.uploadFailed": "Caricamento non riuscito",
   "products.retryFailed": "Riprova non riuscita",
 
@@ -326,6 +357,9 @@ const it: Record<string, string> = {
   "products.activeNeedsDescription":
     "I prodotti attivi richiedono una descrizione",
   "products.unableToSaveProduct": "Impossibile salvare il prodotto.",
+  "products.productCreated": "Prodotto creato correttamente.",
+  "products.productUpdated": "Prodotto aggiornato correttamente.",
+  "products.completeHighlightedFields": "Completa i campi evidenziati prima di salvare il prodotto.",
 
   "products.stockHistory": "Storico scorte",
   "products.receiveStock": "Carica scorte",
@@ -396,6 +430,8 @@ const it: Record<string, string> = {
   "products.saveCategory": "Salva categoria",
   "products.nameRequired": "Il nome è obbligatorio",
   "products.unableToSaveCategory": "Impossibile salvare la categoria",
+  "products.categoryCreated": "Categoria creata correttamente.",
+  "products.categoryUpdated": "Categoria aggiornata correttamente.",
 
   "products.availableEquals": "Disponibili = a magazzino − riservate",
   "products.stockBalances": "Saldi di magazzino",

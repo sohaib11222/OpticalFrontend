@@ -14,19 +14,21 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { UserDropdown } from "@/components/UserDropdown";
 import ThemeCustomizer from "@/components/theme-customizer";
 import Footer from "@/layouts/Footer";
+import { useTranslation } from "@/i18n";
 export default function AppLayout() {
   const { user } = useSession();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(() => window.innerWidth >= 1024);
   const [hovered, setHovered] = useState(false);
   const [subscriptionBlocked, setSubscriptionBlocked] = useState<{
     renewalUrl: string | null;
-    message: string;
+    messageKey: "vista.subscriptionInactive" | "vista.subscriptionAccessLost";
   } | null>(() => {
     const renewalUrl = user?.vista_subscription?.renewal_url;
     return user?.vista_subscription && !user.vista_subscription.active
       ? {
           renewalUrl: typeof renewalUrl === "string" && /^https:\/\//.test(renewalUrl) ? renewalUrl : null,
-          message: "Your Vista Express 360 subscription is not active.",
+          messageKey: "vista.subscriptionInactive",
         }
       : null;
   });
@@ -43,7 +45,7 @@ export default function AppLayout() {
       const candidate = detail?.entitlement?.renewal_url ?? detail?.renewal_url;
       setSubscriptionBlocked({
         renewalUrl: typeof candidate === "string" && /^https:\/\//.test(candidate) ? candidate : null,
-        message: "Your Vista Express 360 subscription has expired, is suspended, or no longer includes CRM access.",
+        messageKey: "vista.subscriptionAccessLost",
       });
     };
     window.addEventListener("optical:vista-subscription-required", handleBlocked);
@@ -73,14 +75,14 @@ export default function AppLayout() {
         <ThemeCustomizer />
       </SidebarInset>
       {subscriptionBlocked && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-label="Vista Express 360 subscription required">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-label={t("vista.subscriptionRequired")}>
           <div className="w-full max-w-lg rounded-2xl border border-blue-100 bg-background p-6 shadow-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Vista Express 360</p>
-            <h2 className="mt-2 text-2xl font-bold">CRM access needs renewal</h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">{subscriptionBlocked.message} Your shop data remains safely stored. Renew or change the plan in Vista Express, then sign in again.</p>
+            <h2 className="mt-2 text-2xl font-bold">{t("vista.subscriptionRenewalTitle")}</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">{t(subscriptionBlocked.messageKey)} {t("vista.subscriptionRenewalDescription")}</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              {subscriptionBlocked.renewalUrl && <a className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90" href={subscriptionBlocked.renewalUrl}>Manage Vista Express 360</a>}
-              <button type="button" className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-semibold shadow-sm transition hover:bg-accent" onClick={() => window.location.assign("/auth/login")}>Return to sign in</button>
+              {subscriptionBlocked.renewalUrl && <a className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow transition hover:bg-primary/90" href={subscriptionBlocked.renewalUrl}>{t("vista.manageSubscription")}</a>}
+              <button type="button" className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-semibold shadow-sm transition hover:bg-accent" onClick={() => window.location.assign("/auth/login")}>{t("vista.returnToSignIn")}</button>
             </div>
           </div>
         </div>

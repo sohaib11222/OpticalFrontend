@@ -59,6 +59,10 @@ const en = {
     "The authorization response is incomplete. Start again.",
   "vista.authError": "Vista authorization failed.",
   "vista.subscriptionRequired": "This Vista Express seller needs an active Vista Express 360 subscription before the CRM can be opened.",
+  "vista.subscriptionInactive": "Your Vista Express 360 subscription is not active.",
+  "vista.subscriptionAccessLost": "Your Vista Express 360 subscription has expired, is suspended, or no longer includes CRM access.",
+  "vista.subscriptionRenewalTitle": "CRM access needs renewal",
+  "vista.subscriptionRenewalDescription": "Your shop data remains safely stored. Renew or change the plan in Vista Express, then sign in again.",
   "vista.manageSubscription": "View or renew Vista Express 360",
   "vista.returnToSignIn": "Return to sign in",
 
@@ -93,6 +97,11 @@ const en = {
   "vista.productType": "Vista product type: {type}",
   "vista.subcategoryLabel": "Vista subcategory",
   "vista.quantityLabel": "Quantity to allocate now",
+  "vista.totalStockAutomatic": "Total stock (automatic)",
+  "vista.totalStockAutomaticHelp":
+    "This total is calculated from the quantities entered for packs or variations. You do not need to divide a separate product total manually.",
+  "vista.totalStockExceedsAvailable":
+    "The variation total is higher than the {available} units currently available in your shop.",
   "vista.optionAllocationTotal":
     "Option allocation total: {total}. Must equal quantity to allocate now ({quantity}).",
   "vista.publishBtn": "Publish with chosen allocation",
@@ -217,6 +226,10 @@ const it = {
     "La risposta di autorizzazione è incompleta. Ricomincia.",
   "vista.authError": "Autorizzazione Vista non riuscita.",
   "vista.subscriptionRequired": "Questo venditore Vista Express necessita di un abbonamento Vista Express 360 attivo prima di poter aprire il CRM.",
+  "vista.subscriptionInactive": "Il tuo abbonamento Vista Express 360 non è attivo.",
+  "vista.subscriptionAccessLost": "Il tuo abbonamento Vista Express 360 è scaduto, sospeso oppure non include più l’accesso al CRM.",
+  "vista.subscriptionRenewalTitle": "L’accesso al CRM richiede un rinnovo",
+  "vista.subscriptionRenewalDescription": "I dati del tuo negozio restano conservati in sicurezza. Rinnova o modifica il piano in Vista Express, quindi accedi di nuovo.",
   "vista.manageSubscription": "Visualizza o rinnova Vista Express 360",
   "vista.returnToSignIn": "Torna all'accesso",
 
@@ -251,6 +264,11 @@ const it = {
   "vista.productType": "Tipo di prodotto Vista: {type}",
   "vista.subcategoryLabel": "Sottocategoria Vista",
   "vista.quantityLabel": "Quantità da allocare adesso",
+  "vista.totalStockAutomatic": "Scorte totali (automatiche)",
+  "vista.totalStockAutomaticHelp":
+    "Questo totale viene calcolato dalle quantità inserite per confezioni o varianti. Non devi dividere manualmente un totale prodotto separato.",
+  "vista.totalStockExceedsAvailable":
+    "Il totale delle varianti supera le {available} unità disponibili nel tuo negozio.",
   "vista.optionAllocationTotal":
     "Totale allocato tra le opzioni: {total}. Deve essere uguale alla quantità da allocare adesso ({quantity}).",
   "vista.publishBtn": "Pubblica con l'allocazione scelta",

@@ -2,9 +2,10 @@ import OperationsWorkspace from "@/pages/operations/OperationsWorkspace";
 import type { VistaStatus } from "../../../../contracts/vista";
 import SourceLinks from "@/pages/integrations/SourceLinks";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Search, Grid2X2, List } from "lucide-react";
-import { useSession } from "@/auth/session";
+import { api, useSession } from "@/auth/session";
+import { toast } from "sonner";
 import { useTranslation } from "@/i18n";
 import { useApiResource } from "@/hooks/use-api-resource";
 import {
@@ -27,17 +28,19 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { CategoryPicker, Choice, Paging, ProductPhoto } from "./catalog-shared";
-import { money, type Product } from "../../../../contracts/commerce";
+import { money, type Category, type Product } from "../../../../contracts/commerce";
 import type { Page } from "../../../../contracts/customers";
 export default function ProductList({ grid = false }: { grid?: boolean }) {
   const { t, translateError } = useTranslation();
   const { user } = useSession();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [stock, setStock] = useState("all");
   const [sort, setSort] = useState("name");
   const [category, setCategory] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [checkingCategories, setCheckingCategories] = useState(false);
   const q = new URLSearchParams({ search, sort, page: String(page) });
   if (status !== "all") q.set("status", status);
   if (stock !== "all") q.set("stock", stock);
@@ -52,6 +55,27 @@ export default function ProductList({ grid = false }: { grid?: boolean }) {
     user?.permissions.includes("integrations.publish") &&
     vista.data?.data.connection &&
     vista.data.data.connection.status !== "disconnected";
+  const beginProduct = async () => {
+    setCheckingCategories(true);
+    try {
+      const categories = await api.request<Page<Category>>(
+        "/product-categories?status=active&page=1",
+      );
+      if (!categories.data.length) {
+        navigate("/product-categories?notice=category-required");
+        return;
+      }
+      navigate("/products/new");
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error
+          ? translateError(cause.message)
+          : t("products.categoryCheckFailed"),
+      );
+    } finally {
+      setCheckingCategories(false);
+    }
+  };
   return (
     <div className="space-y-6">
       <SourceLinks kind="products" />
@@ -73,11 +97,9 @@ export default function ProductList({ grid = false }: { grid?: boolean }) {
             </Button>
           )}
           {user?.permissions.includes("products.write") && user.permissions.includes("products.create") && (
-            <Button asChild>
-              <Link to="/products/new">
+            <Button disabled={checkingCategories} onClick={() => void beginProduct()}>
                 <Plus className="h-4 w-4" />
-                {t("products.addProduct")}
-              </Link>
+                {checkingCategories ? t("common.loading") : t("products.addProduct")}
             </Button>
           )}
         </div>
