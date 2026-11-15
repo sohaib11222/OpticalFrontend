@@ -28,6 +28,12 @@ import type {
   Page,
 } from "../../../../contracts/customers";
 import CustomerForm from "./CustomerForm";
+
+function whatsappHref(phone: string, name: string) {
+  const recipient = phone.replace(/\D/g, "").replace(/^00/, "");
+  return `https://wa.me/${recipient}?text=${encodeURIComponent(`Hello ${name},`)}`;
+}
+
 export default function CustomerDetails() {
   const { id } = useParams();
   const { user } = useSession();
@@ -131,7 +137,10 @@ export default function CustomerDetails() {
           </div>
           <Badge variant="secondary">{t("status." + c.status)}</Badge>
         </div>
-        {c.status === 'active' && user?.permissions.includes('communications.send') && user.permissions.includes('communications.read') && <div className="flex flex-wrap gap-2">{['sms', 'whatsapp', 'email'].map(channel => <Button key={channel} variant="outline" asChild><Link to={'/communications?' + new URLSearchParams({customer: String(c.id), compose: channel})}>{t('ops.' + channel)}</Link></Button>)}</div>}
+        {c.status === 'active' && user?.permissions.includes('communications.send') && user.permissions.includes('communications.read') && <div className="flex flex-wrap gap-2">
+          {c.email && <Button variant="outline" asChild><Link to={'/communications?' + new URLSearchParams({ customer: String(c.id), compose: 'email' })}>{t('ops.email')}</Link></Button>}
+          {c.phone && <Button variant="outline" asChild><a href={whatsappHref(c.phone, `${c.first_name} ${c.last_name}`)} target="_blank" rel="noreferrer">{t('ops.whatsapp')}</a></Button>}
+        </div>}
         {canWrite && (
           <div className="flex gap-2">
             {c.status === "active" && user?.permissions.includes("customers.edit") && (

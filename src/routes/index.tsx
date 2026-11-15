@@ -34,6 +34,7 @@ import VerifyPage from "@/auth/VerifyPage";
 import FoundationHome from "@/pages/FoundationHome";
 import AccountSecurity from "@/pages/account/AccountSecurity";
 import NotFound from "@/pages/NotFound";
+import SupportTickets from "@/pages/support/SupportTickets";
 export const router = createBrowserRouter(
   [
     { path: "/auth/vista/callback", element: <VistaCallback /> },
@@ -65,6 +66,7 @@ export const router = createBrowserRouter(
 { path: "/followups", element: <OperationsWorkspace module="followups" /> },
 { path: "/communications", element: <OperationsWorkspace module="communications" /> },
 { path: "/payments", element: <OperationsWorkspace module="payments" /> },
+                { path: "/support", element: <SupportTickets /> },
                 { path: "/dashboard", element: <EcommerceDashboard /> },
                 { path: "/reports/sales", element: <SalesReport /> },
                 { path: "/orders", element: <OrderList /> },

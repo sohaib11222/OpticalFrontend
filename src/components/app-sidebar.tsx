@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ChartNoAxesCombined, ShoppingBag, Box, PackageSearch,
   Settings, Glasses, Home, ShieldCheck, Users, CalendarDays, Files,
   FileSpreadsheet, UserCog, AlarmClock, Workflow, MessagesSquare,
-  WalletCards, History, PlugZap,
+  WalletCards, History, PlugZap, LifeBuoy,
 } from "lucide-react";
 import {
   Sidebar,
@@ -55,6 +55,7 @@ export function AppSidebar({ onHoverChange, ...props }: Props) {
     { label: "nav.groupRecords", items: [
       { to: "/documents", label: "nav.documents", Icon: Files, show: can("files.read") },
       { to: "/customer-imports", label: "nav.customerImports", Icon: FileSpreadsheet, show: can("imports.read") },
+      { to: "/support", label: "Support tickets", Icon: LifeBuoy, show: can("support.read") },
       { to: "/activity", label: "ops.audit", Icon: History, show: can("audit.read") },
     ] },
     { label: "nav.groupAdministration", items: [

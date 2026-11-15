@@ -28,6 +28,12 @@ import {
 } from "@/components/ui/table";
 import CustomerForm from "./CustomerForm";
 import type { Customer, ResourcePage } from "../../../../contracts/customers";
+
+function whatsappHref(phone: string, name: string) {
+  const recipient = phone.replace(/\D/g, "").replace(/^00/, "");
+  return `https://wa.me/${recipient}?text=${encodeURIComponent(`Hello ${name},`)}`;
+}
+
 export default function CustomerList() {
   const { user } = useSession();
   const { t } = useTranslation();
@@ -180,7 +186,7 @@ export default function CustomerList() {
             <span>{t('ops.selectedCustomers')}: {selectedIds.length} / 100</span>
             <Button variant="outline" onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.filter(c => c.status === 'active').map(c => c.id) ?? [])])].slice(0, 100))}>{t('ops.selectPage')}</Button>
             <Button variant="outline" onClick={() => setSelectedIds([])}>{t('ops.clearSelection')}</Button>
-            {['sms', 'email'].map(channel => <Button key={channel} disabled={!selectedIds.length} onClick={() => navigate('/communications?' + new URLSearchParams({compose: channel, customers: selectedIds.join(',')}))}>{t(channel === 'sms' ? 'ops.bulkSms' : 'ops.bulkEmail')}</Button>)}
+            <Button disabled={!selectedIds.length} onClick={() => navigate('/communications?' + new URLSearchParams({compose: 'email', customers: selectedIds.join(',')}))}>{t('ops.bulkEmail')}</Button>
           </div>}
           <Table>
             <TableHeader>
@@ -231,7 +237,10 @@ export default function CustomerList() {
                         {t("customers.view")}
                       </Link>
                     </Button>
-                    {canMessage && c.status === 'active' && <div className="flex flex-wrap gap-1 mt-2">{['sms', 'whatsapp', 'email'].map(channel => <Button key={channel} variant="outline" size="sm" disabled={channel === 'email' ? !c.email : !c.phone} onClick={() => navigate('/communications?' + new URLSearchParams({customer: String(c.id), compose: channel}))}>{t('ops.' + channel)}</Button>)}</div>}
+                    {canMessage && c.status === 'active' && <div className="flex flex-wrap gap-1 mt-2">
+                      {c.email && <Button variant="outline" size="sm" onClick={() => navigate('/communications?' + new URLSearchParams({ customer: String(c.id), compose: 'email' }))}>{t('ops.email')}</Button>}
+                      {c.phone && <Button variant="outline" size="sm" asChild><a href={whatsappHref(c.phone, `${c.first_name} ${c.last_name}`)} target="_blank" rel="noreferrer">{t('ops.whatsapp')}</a></Button>}
+                    </div>}
                   </TableCell>
                 </TableRow>
               ))}

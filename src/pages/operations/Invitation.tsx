@@ -10,12 +10,23 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { errorText } from "../../../../contracts/operations/shared";
 export default function Invitation() {
   const { t } = useTranslation();
-  const [token] = useState(() => window.location.hash.slice(1));
+  // Query-string invitations survive browser/email-link handling.  Accept
+  // the legacy hash form too so already-issued invitations continue to work.
+  const [token] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get("token") ||
+      window.location.hash.replace(/^#/, ""),
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const invalidToken = !/^[A-Za-z0-9]{64}$/.test(token);
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (invalidToken) {
+      setError("This invitation link is missing, invalid, or incomplete. Ask your shop owner to send a new invitation.");
+      return;
+    }
     setBusy(true);
     setError("");
     const data = new FormData(e.currentTarget);
@@ -42,6 +53,10 @@ export default function Invitation() {
         <CardContent>
           {done ? (
             <p role="status">{t("ops.invitationAccepted")}</p>
+          ) : invalidToken ? (
+            <p role="alert" className="text-destructive">
+              This invitation link is missing, invalid, or incomplete. Ask your shop owner to send a new invitation.
+            </p>
           ) : (
             <form onSubmit={(e) => void submit(e)} className="space-y-4">
               <Label htmlFor="invite-password">{t("ops.password")}</Label>

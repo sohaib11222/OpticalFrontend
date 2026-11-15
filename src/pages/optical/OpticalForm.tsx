@@ -107,10 +107,20 @@ export default function OpticalForm({
         {
           method: record ? "PATCH" : "POST",
           body: JSON.stringify({
-            ...values,
+            // Keep the clinical dictionary values in the required nested
+            // array.  Do not spread form internals into the API payload.
+            recorded_on: values.recorded_on,
+            practitioner: values.practitioner,
             prescription_id: values.prescription_id
               ? Number(values.prescription_id)
               : null,
+            source_record_id: values.source_record_id || null,
+            data: Object.fromEntries(
+              Object.entries(values.data || {}).map(([field, value]) => [
+                field,
+                value === "" || value === undefined ? null : value,
+              ]),
+            ),
             creation_key: record ? undefined : key,
             version: record?.version,
           }),

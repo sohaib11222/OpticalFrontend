@@ -223,8 +223,14 @@ export default function OperationsWorkspace({
       params,
       actorId: user?.id ?? 0,
       timezone: user?.shop?.timezone ?? "UTC",
-      invitationUrl: (token: string) =>
-        window.location.origin + "/pulse-ui/auth/invitation#" + token,
+      invitationUrl: (token: string) => {
+        // Respect the Vite base in development/subpath deployments while
+        // avoiding the retired /pulse-ui fragment URL used by the old host.
+        const base = new URL(import.meta.env.BASE_URL, window.location.origin);
+        const url = new URL("auth/invitation", base);
+        url.searchParams.set("token", token);
+        return url.toString();
+      },
     }),
     [user, t, params],
   );
