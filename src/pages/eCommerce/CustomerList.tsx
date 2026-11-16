@@ -29,10 +29,10 @@ import {
 } from "@/components/ui/table";
 import CustomerForm from "./CustomerForm";
 import type { Customer, ResourcePage } from "../../../../contracts/customers";
+import { openWhatsAppWeb, whatsappWebUrl } from "../../../../contracts/operations/shared";
 
-function whatsappHref(phone: string, name: string) {
-  const recipient = phone.replace(/\D/g, "").replace(/^00/, "");
-  return `https://wa.me/${recipient}?text=${encodeURIComponent(`Hello ${name},`)}`;
+function openCustomerWhatsApp(phone: string, name: string) {
+  openWhatsAppWeb(whatsappWebUrl(phone, `Hello ${name},`));
 }
 
 export default function CustomerList() {
@@ -260,7 +260,7 @@ export default function CustomerList() {
                     </Button>
                     {canMessage && c.status === 'active' && <div className="flex flex-wrap gap-1 mt-2">
                       {c.email && <Button variant="outline" size="sm" onClick={() => navigate('/communications?' + new URLSearchParams({ customer: String(c.id), compose: 'email' }))}>{t('ops.email')}</Button>}
-                      {c.phone && <Button variant="outline" size="sm" asChild><a href={whatsappHref(c.phone, `${c.first_name} ${c.last_name}`)} target="_blank" rel="noreferrer">{t('ops.whatsapp')}</a></Button>}
+                      {c.phone && <Button variant="outline" size="sm" onClick={() => openCustomerWhatsApp(c.phone!, `${c.first_name} ${c.last_name}`)}>{t('ops.whatsapp')}</Button>}
                     </div>}
                   </TableCell>
                 </TableRow>

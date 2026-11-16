@@ -27,11 +27,11 @@ import type {
   CustomerEvent,
   Page,
 } from "../../../../contracts/customers";
+import { openWhatsAppWeb, whatsappWebUrl } from "../../../../contracts/operations/shared";
 import CustomerForm from "./CustomerForm";
 
-function whatsappHref(phone: string, name: string) {
-  const recipient = phone.replace(/\D/g, "").replace(/^00/, "");
-  return `https://wa.me/${recipient}?text=${encodeURIComponent(`Hello ${name},`)}`;
+function openCustomerWhatsApp(phone: string, name: string) {
+  openWhatsAppWeb(whatsappWebUrl(phone, `Hello ${name},`));
 }
 
 export default function CustomerDetails() {
@@ -139,7 +139,7 @@ export default function CustomerDetails() {
         </div>
         {c.status === 'active' && user?.permissions.includes('communications.send') && user.permissions.includes('communications.read') && <div className="flex flex-wrap gap-2">
           {c.email && <Button variant="outline" asChild><Link to={'/communications?' + new URLSearchParams({ customer: String(c.id), compose: 'email' })}>{t('ops.email')}</Link></Button>}
-          {c.phone && <Button variant="outline" asChild><a href={whatsappHref(c.phone, `${c.first_name} ${c.last_name}`)} target="_blank" rel="noreferrer">{t('ops.whatsapp')}</a></Button>}
+          {c.phone && <Button variant="outline" onClick={() => openCustomerWhatsApp(c.phone!, `${c.first_name} ${c.last_name}`)}>{t('ops.whatsapp')}</Button>}
         </div>}
         {canWrite && (
           <div className="flex gap-2">
