@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { LoaderCircle, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -45,9 +46,7 @@ export default function VistaPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [review, setReview] = useState<VistaRecord | null>(null);
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
+  const [selectedCustomers, setSelectedCustomers] = useState<number[]>([]);
   const [batch, setBatch] = useState<number | null>(null);
   const [detail, setDetail] = useState<VistaRecord | null>(null);
   const rows = useApiResource<Page<VistaRecord>>(
@@ -58,6 +57,8 @@ export default function VistaPage() {
   );
   const { reload: reloadConnection, loading: loadingConnection } = q;
   const { reload: reloadRecords, loading: loadingRecords } = rows;
+
+  useEffect(() => { setSelectedCustomers([]); }, [kind, page, search]);
 
   useEffect(() => {
     if (loadingConnection || loadingRecords) return;
@@ -80,6 +81,20 @@ export default function VistaPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function importCustomers() {
+    if (!selectedCustomers.length) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api.post<{ data: { id: number } }>("/integrations/vista/customer-imports", { automatic: true, rows: selectedCustomers.map((id) => ({ id })) });
+      setBatch(result.data.id);
+      setSelectedCustomers([]);
+      toast.success(t("vista.customerImportStarted"));
+    } catch (cause) {
+      setError(translateError(cause instanceof Error ? cause.message : t("vista.actionFailed")));
+    } finally { setBusy(false); }
   }
 
   const columns =
@@ -113,72 +128,13 @@ export default function VistaPage() {
           {translateError(q.error || error)}
         </p>
       )}
+      <Card><CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+        <div><p className="font-semibold">{c && c.status !== "disconnected" ? c.store_name : t("vista.notConnected")}</p><p className="text-sm text-muted-foreground">{c && c.status !== "disconnected" ? t("vista.connectedDescription") : t("vista.connectDescription")}</p></div>
+        {q.data?.data.enabled && user?.permissions.includes("integrations.write") && (c && c.status !== "disconnected" ? <Button variant="outline" disabled={busy} onClick={() => { if (window.confirm(t("vista.disconnectConfirm"))) void action("disconnect"); }}>{busy ? <LoaderCircle className="size-4 animate-spin" /> : null}{t("vista.disconnect")}</Button> : <VistaSignIn connect />)}
+      </CardContent></Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t("vista.sellerConnection")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p>
-            {t("vista.independentNote")}
-          </p>
-          {q.loading && !q.data ? (
-            <p role="status">{t("vista.loadingConnection")}</p>
-          ) : !q.data?.data.enabled ? (
-            <p>
-              {t("vista.notConfigured")}
-            </p>
-          ) : (
-            <>
-              {c && (
-                <>
-                  <p>
-                    <strong>{c.store_name}</strong> · {t("vista.vistaStore", { id: c.store_id })} · {t("status." + c.status)}
-                  </p>
-                  <p className="text-sm">
-                    {t("vista.lastSync", { syncedAt: c.synced_at || t("common.never"), expiresAt: c.expires_at })}
-                  </p>
-                  {q.data?.data.processing?.worker_active === false && <p role="alert">{t("vista.workerUnavailable")}</p>}
-                  {!c.synced_at && <p role="status">{t("vista.initialSync")}</p>}
-                  {c.last_error && <p role="alert">{translateError(c.last_error)}</p>}
-                </>
-              )}
-              {user?.permissions.includes("integrations.write") && (
-                <>
-                  <VistaSignIn connect />
-                  {c && c.status !== "disconnected" && (
-                    <div className="flex gap-2">
-                      <Button
-                        disabled={busy || c.status === "syncing"}
-                        onClick={() => void action("sync")}
-                      >
-                        {t("vista.syncData")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => {
-                          if (
-                            window.confirm(t("vista.disconnectConfirm"))
-                          )
-                            void action("disconnect");
-                        }}
-                      >
-                        {t("vista.disconnect")}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-          <p className="text-sm text-muted-foreground">
-            {t("vista.publishNote")}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("vista.recordsTitle")}</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>{t("vista.recordsTitle")}</CardTitle>{kind === "customers" && user?.permissions.includes("imports.write") && user.permissions.includes("customers.write") && <Button disabled={busy || !selectedCustomers.length} onClick={() => void importCustomers()}>{busy ? <LoaderCircle className="size-4 animate-spin" /> : <UsersRound className="size-4" />}{t("vista.importCustomers", { count: selectedCustomers.length })}</Button>}</div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2 flex-wrap">
@@ -218,7 +174,7 @@ export default function VistaPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("vista.colVistaId")}</TableHead>
+                {kind === "customers" && user?.permissions.includes("imports.write") && user.permissions.includes("customers.write") && <TableHead><input type="checkbox" aria-label={t("vista.selectAllCustomers")} checked={!!rows.data?.data.length && rows.data.data.every((record) => selectedCustomers.includes(record.id))} onChange={(event) => setSelectedCustomers(event.target.checked ? [...new Set([...selectedCustomers, ...(rows.data?.data.map((record) => record.id) ?? [])])] : selectedCustomers.filter((id) => !rows.data?.data.some((record) => record.id === id)))} /></TableHead>}
                 {columns.map((k) => (
                   <TableHead key={k}>{t("vista.field." + k)}</TableHead>
                 ))}
@@ -228,7 +184,7 @@ export default function VistaPage() {
             <TableBody>
               {rows.data?.data.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell>{r.remote_id}</TableCell>
+                  {kind === "customers" && user?.permissions.includes("imports.write") && user.permissions.includes("customers.write") && <TableCell><input type="checkbox" aria-label={String(r.payload.name ?? r.id)} checked={selectedCustomers.includes(r.id)} onChange={(event) => setSelectedCustomers(event.target.checked ? [...new Set([...selectedCustomers, r.id])] : selectedCustomers.filter((id) => id !== r.id))} /></TableCell>}
                   {columns.map((k) => (
                     <TableCell key={k}>
                       {displayVistaValue(r.payload[k])}
@@ -242,21 +198,6 @@ export default function VistaPage() {
                     >
                       {t("vista.details")}
                     </Button>
-                    {kind === "customers" &&
-                      user?.permissions.includes("imports.write") &&
-                      user.permissions.includes("customers.write") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFirst("");
-                            setLast("");
-                            setReview(r);
-                          }}
-                        >
-                          {t("vista.reviewCustomerImport")}
-                        </Button>
-                      )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -290,73 +231,7 @@ export default function VistaPage() {
           </div>
         </CardContent>
       </Card>
-      {batch && (
-        <p>
-          {t("vista.contactPreviewCreated")}{" "}
-          <Link className="underline" to={"/customer-imports/" + batch}>
-            {t("vista.openImportReview", { id: batch })}
-          </Link>
-          .
-        </p>
-      )}
-      <Dialog
-        open={!!review}
-        onOpenChange={(open) => {
-          if (!open) setReview(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("vista.reviewTitle")}</DialogTitle>
-          </DialogHeader>
-          <p>
-            {t("vista.reviewDescription", { name: String(review?.payload.name ?? "") })}
-          </p>
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!review || busy) return;
-              setBusy(true);
-              setError("");
-              void api
-                .post<{ data: { id: number } }>(
-                  "/integrations/vista/customer-imports",
-                  {
-                    rows: [
-                      { id: review.id, first_name: first, last_name: last },
-                    ],
-                  },
-                )
-                .then((r) => {
-                  setBatch(r.data.id);
-                  setReview(null);
-                })
-                .catch((e) => setError(translateError(e.message)))
-                .finally(() => setBusy(false));
-            }}
-          >
-            <Label htmlFor="vista-first">{t("vista.firstName")}</Label>
-            <Input
-              id="vista-first"
-              required
-              maxLength={100}
-              value={first}
-              onChange={(e) => setFirst(e.target.value)}
-            />
-            <Label htmlFor="vista-last">{t("imports.lastName")}</Label>
-            <Input
-              id="vista-last"
-              required
-              maxLength={100}
-              value={last}
-              onChange={(e) => setLast(e.target.value)}
-            />
-            {error && <p role="alert">{translateError(error)}</p>}
-            <Button disabled={busy}>{t("vista.createReview")}</Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {batch && <Card><CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5"><p className="font-medium">{t("vista.customerImportResult")}</p><Button asChild variant="outline"><Link to={"/customer-imports/" + batch}>{t("vista.viewImportResult")}</Link></Button></CardContent></Card>}
       <Dialog
         open={!!detail}
         onOpenChange={(open) => {

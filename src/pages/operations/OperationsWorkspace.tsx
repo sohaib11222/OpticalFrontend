@@ -3,7 +3,7 @@ import type { Product } from "../../../../contracts/commerce";
 import LanguageToggle from "@/components/LanguageToggle";
 import Output from "../../../../contracts/operations/Output";
 import { useId, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
 import { useTranslation } from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -214,6 +214,8 @@ export default function OperationsWorkspace({
   const { user } = useSession();
   const { t } = useTranslation();
   const [params] = useSearchParams();
+  const location = useLocation();
+  const recipientState = location.state as { recipientIds?: number[]; recipientCount?: number } | null;
   const value = useMemo(
     () => ({
       ui,
@@ -231,8 +233,10 @@ export default function OperationsWorkspace({
         url.searchParams.set("token", token);
         return url.toString();
       },
+      initialRecipientIds: Array.isArray(recipientState?.recipientIds) ? recipientState.recipientIds.filter((id): id is number => Number.isInteger(id) && id > 0) : [],
+      initialRecipientCount: Number.isInteger(recipientState?.recipientCount) ? Math.max(0, recipientState?.recipientCount ?? 0) : 0,
     }),
-    [user, t, params],
+    [user, t, params, recipientState],
   );
   if (
     !module.startsWith("output-") &&

@@ -2,8 +2,9 @@ import OperationsWorkspace from "@/pages/operations/OperationsWorkspace";
 import SourceLinks from "@/pages/integrations/SourceLinks";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search, Users } from "lucide-react";
-import { useSession } from "@/auth/session";
+import { LoaderCircle, Plus, Search, Users } from "lucide-react";
+import { api, useSession } from "@/auth/session";
+import { toast } from "sonner";
 import { useTranslation } from "@/i18n";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -44,6 +45,9 @@ export default function CustomerList() {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectionBusy, setSelectionBusy] = useState(false);
+  const [rangeStart, setRangeStart] = useState("1");
+  const [rangeEnd, setRangeEnd] = useState("20");
   const canMessage = !!user?.permissions.includes('communications.send') && user.permissions.includes('communications.read');
   const [sort, setSort] = useState("last_name");
   const query = new URLSearchParams({
@@ -57,6 +61,22 @@ export default function CustomerList() {
   const { data, error, loading, reload } = useApiResource<
     ResourcePage<Customer>
   >("/customers?" + query);
+  const filters = { search, status, city, sort, direction: "asc" };
+  async function openBulk(mode: "ids" | "filtered" | "active_filtered" | "range", extra: Record<string, unknown> = {}) {
+    setSelectionBusy(true);
+    try {
+      const result = await api.request<{ data: { ids: number[]; count: number } }>("/communications/recipients", { method: "POST", body: JSON.stringify({ mode, filters, ...extra }) });
+      if (!result.data.count) {
+        toast.warning(t("ops.noEmailRecipients"));
+        return;
+      }
+      navigate("/communications?compose=email", { state: { recipientIds: result.data.ids, recipientCount: result.data.count } });
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : t("ops.selectionFailed"));
+    } finally {
+      setSelectionBusy(false);
+    }
+  }
   return (
     <div className="space-y-6">
       <SourceLinks kind="customers" />
@@ -182,16 +202,19 @@ export default function CustomerList() {
             </p>
           )}
           {loading && <p role="status">{t("customers.loading")}</p>}
-          {canMessage && <div className="flex flex-wrap items-center gap-2">
-            <span>{t('ops.selectedCustomers')}: {selectedIds.length} / 100</span>
-            <Button variant="outline" onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.filter(c => c.status === 'active').map(c => c.id) ?? [])])].slice(0, 100))}>{t('ops.selectPage')}</Button>
-            <Button variant="outline" onClick={() => setSelectedIds([])}>{t('ops.clearSelection')}</Button>
-            <Button disabled={!selectedIds.length} onClick={() => navigate('/communications?' + new URLSearchParams({compose: 'email', customers: selectedIds.join(',')}))}>{t('ops.bulkEmail')}</Button>
-          </div>}
+          {canMessage && <div className="space-y-3 rounded-lg border bg-muted/20 p-3"><div className="flex flex-wrap items-center gap-2">
+            <span>{t('ops.selectedCustomers')}: {selectedIds.length}</span>
+            <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.map(c => c.id) ?? [])])])}>{t('ops.selectCurrentPage')}</Button>
+            <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.filter(c => c.status === 'active').map(c => c.id) ?? [])])])}>{t('ops.selectPage')}</Button>
+            <Button variant="outline" disabled={selectionBusy} onClick={() => void openBulk('filtered')}>{t('ops.selectAllFiltered')}</Button>
+            <Button variant="outline" disabled={selectionBusy} onClick={() => void openBulk('active_filtered')}>{t('ops.selectAllActive')}</Button>
+            <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([])}>{t('ops.clearSelection')}</Button>
+            <Button disabled={!selectedIds.length || selectionBusy} onClick={() => void openBulk('ids', { ids: selectedIds })}>{selectionBusy && <LoaderCircle className="size-4 animate-spin" />}{t('ops.bulkEmail')}</Button>
+          </div><div className="flex flex-wrap items-end gap-2 border-t pt-3"><div><Label htmlFor="bulk-range-start">{t('ops.startRow')}</Label><Input id="bulk-range-start" type="number" min="1" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} className="w-28" /></div><div><Label htmlFor="bulk-range-end">{t('ops.endRow')}</Label><Input id="bulk-range-end" type="number" min="1" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} className="w-28" /></div><Button variant="outline" disabled={selectionBusy || !rangeStart || !rangeEnd || Number(rangeEnd) < Number(rangeStart)} onClick={() => void openBulk('range', { start_row: Number(rangeStart), end_row: Number(rangeEnd) })}>{t('ops.bulkEmailRange')}</Button></div></div>}
           <Table>
             <TableHeader>
               <TableRow>
-                {canMessage && <TableHead>{t('ops.selectCustomer')}</TableHead>}
+                {canMessage && <TableHead><input type="checkbox" aria-label={t('ops.selectCurrentPage')} checked={!!data?.data.length && data.data.every((c) => selectedIds.includes(c.id))} onChange={(event) => setSelectedIds(event.target.checked ? [...new Set([...selectedIds, ...(data?.data.map((c) => c.id) ?? [])])] : selectedIds.filter((id) => !data?.data.some((c) => c.id === id)))} /></TableHead>}
                 {[
                   t("customers.colCustomer"),
                   t("customers.colContact"),
@@ -207,7 +230,7 @@ export default function CustomerList() {
             <TableBody>
               {data?.data.map((c) => (
                 <TableRow key={c.id}>
-                  {canMessage && <TableCell><input type="checkbox" aria-label={t('ops.selectCustomer') + ' ' + c.first_name + ' ' + c.last_name} checked={selectedIds.includes(c.id)} disabled={c.status !== 'active' || (!selectedIds.includes(c.id) && selectedIds.length >= 100)} onChange={e => setSelectedIds(e.target.checked ? [...selectedIds, c.id] : selectedIds.filter(id => id !== c.id))} /></TableCell>}
+                  {canMessage && <TableCell><input type="checkbox" aria-label={t('ops.selectCustomer') + ' ' + c.first_name + ' ' + c.last_name} checked={selectedIds.includes(c.id)} onChange={e => setSelectedIds(e.target.checked ? [...new Set([...selectedIds, c.id])] : selectedIds.filter(id => id !== c.id))} /></TableCell>}
                   <TableCell className="font-medium">
                     <Link className="hover:underline" to={"/customers/" + c.id}>
                       {c.first_name} {c.last_name}
