@@ -62,7 +62,7 @@ export default function CustomerList() {
     ResourcePage<Customer>
   >("/customers?" + query);
   const filters = { search, status, city, sort, direction: "asc" };
-  async function openBulk(mode: "ids" | "filtered" | "active_filtered" | "range", extra: Record<string, unknown> = {}) {
+  async function openBulk(mode: "ids" | "range", extra: Record<string, unknown> = {}) {
     setSelectionBusy(true);
     try {
       const result = await api.request<{ data: { ids: number[]; count: number } }>("/communications/recipients", { method: "POST", body: JSON.stringify({ mode, filters, ...extra }) });
@@ -206,8 +206,6 @@ export default function CustomerList() {
             <span>{t('ops.selectedCustomers')}: {selectedIds.length}</span>
             <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.map(c => c.id) ?? [])])])}>{t('ops.selectCurrentPage')}</Button>
             <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([...new Set([...selectedIds, ...(data?.data.filter(c => c.status === 'active').map(c => c.id) ?? [])])])}>{t('ops.selectPage')}</Button>
-            <Button variant="outline" disabled={selectionBusy} onClick={() => void openBulk('filtered')}>{t('ops.selectAllFiltered')}</Button>
-            <Button variant="outline" disabled={selectionBusy} onClick={() => void openBulk('active_filtered')}>{t('ops.selectAllActive')}</Button>
             <Button variant="outline" disabled={selectionBusy} onClick={() => setSelectedIds([])}>{t('ops.clearSelection')}</Button>
             <Button disabled={!selectedIds.length || selectionBusy} onClick={() => void openBulk('ids', { ids: selectedIds })}>{selectionBusy && <LoaderCircle className="size-4 animate-spin" />}{t('ops.bulkEmail')}</Button>
           </div><div className="flex flex-wrap items-end gap-2 border-t pt-3"><div><Label htmlFor="bulk-range-start">{t('ops.startRow')}</Label><Input id="bulk-range-start" type="number" min="1" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} className="w-28" /></div><div><Label htmlFor="bulk-range-end">{t('ops.endRow')}</Label><Input id="bulk-range-end" type="number" min="1" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} className="w-28" /></div><Button variant="outline" disabled={selectionBusy || !rangeStart || !rangeEnd || Number(rangeEnd) < Number(rangeStart)} onClick={() => void openBulk('range', { start_row: Number(rangeStart), end_row: Number(rangeEnd) })}>{t('ops.bulkEmailRange')}</Button></div></div>}

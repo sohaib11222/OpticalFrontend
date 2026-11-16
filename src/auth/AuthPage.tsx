@@ -31,6 +31,11 @@ type Values = {
   name?: string;
   shop_name?: string;
 };
+function defaultDestination(user: SessionUser | null | undefined) {
+  return user?.shop?.status === "active" && (user.email_verified || user.email_verification_required === false)
+    ? "/dashboard"
+    : "/";
+}
 export default function AuthPage({ mode }: { mode: Mode }) {
   const { t, translateError } = useTranslation();
   const [params] = useSearchParams();
@@ -114,7 +119,7 @@ export default function AuthPage({ mode }: { mode: Mode }) {
           values,
         );
         accept(result.data);
-        navigate(safeReturn(params.get("redirectTo"), result.data.shop?.status === "active" && result.data.permissions.includes("operations.read") ? "/dashboard" : "/"), { replace: true });
+        navigate(safeReturn(params.get("redirectTo"), defaultDestination(result.data)), { replace: true });
       } else {
         const result = await api.auth<{ message: string }>(
           mode === "forgot" ? "/forgot-password" : "/reset-password",
@@ -162,7 +167,7 @@ export default function AuthPage({ mode }: { mode: Mode }) {
   if (mode === "login" && loading)
     return <AuthShell><p role="status">{t("user.sessionLoading")}</p></AuthShell>;
   if (mode === "login" && user)
-    return <Navigate to={safeReturn(params.get("redirectTo"), user?.shop?.status === "active" && user.permissions.includes("operations.read") ? "/dashboard" : "/")} replace />;
+    return <Navigate to={safeReturn(params.get("redirectTo"), defaultDestination(user))} replace />;
   return (
     <AuthShell>
       <div className="w-full max-w-md space-y-6">

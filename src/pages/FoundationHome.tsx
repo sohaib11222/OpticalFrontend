@@ -1,5 +1,6 @@
 import { canAccessVerifiedAccount } from "../../../contracts/session";
 import { useEffect, useState, type FormEvent } from "react";
+import { Navigate } from "react-router-dom";
 import { api, useSession } from "@/auth/session";
 import { useTranslation } from "@/i18n";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -62,6 +63,9 @@ export default function FoundationHome() {
       setBusy(false);
     }
   };
+  if (active) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">
