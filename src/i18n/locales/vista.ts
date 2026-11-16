@@ -86,6 +86,9 @@ const en = {
   "vista.cancelConfirm":
     "Ask Vista to cancel this unaccepted operation and release its reserved stock? If already accepted, reconciliation must complete first.",
   "vista.actionFailed": "Action failed.",
+  "vista.publishedToast": "Publication #{id} was accepted by Vista Express.",
+  "vista.publishFailedToast": "Vista Express could not confirm this publication. Review the saved error and retry safely.",
+  "vista.queuedToast": "Publication is processing safely in the background. You can leave this page.",
   "vista.schemaVersionError":
     "Deploy the Vista category-form update on the server before publishing.",
   "vista.cannotLoadCategories": "Cannot load Vista categories",
@@ -253,6 +256,9 @@ const it = {
   "vista.cancelConfirm":
     "Chiedere a Vista di annullare questa operazione non ancora accettata e di rilasciare le scorte riservate? Se è già stata accettata, prima deve completarsi la riconciliazione.",
   "vista.actionFailed": "Operazione non riuscita.",
+  "vista.publishedToast": "La pubblicazione n. {id} è stata accettata da Vista Express.",
+  "vista.publishFailedToast": "Vista Express non ha potuto confermare questa pubblicazione. Controlla l’errore salvato e riprova in sicurezza.",
+  "vista.queuedToast": "La pubblicazione viene elaborata in background. Puoi lasciare questa pagina.",
   "vista.schemaVersionError":
     "Pubblica sul server l'aggiornamento del modulo categorie di Vista prima di procedere.",
   "vista.cannotLoadCategories": "Impossibile caricare le categorie di Vista",

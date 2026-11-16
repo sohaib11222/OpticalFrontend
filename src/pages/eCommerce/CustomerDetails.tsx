@@ -202,6 +202,21 @@ export default function CustomerDetails() {
                 <dd>{sourceLabel(c.source)}</dd>
               </div>
             </dl>
+            {Object.keys(c.custom_fields ?? {}).length > 0 && (
+              <div className="border-t pt-4">
+                <p className="mb-2 font-medium">
+                  {t("customers.additionalInformation")}
+                </p>
+                <dl className="space-y-2 text-sm">
+                  {Object.entries(c.custom_fields ?? {}).map(([key, value]) => (
+                    <div key={key}>
+                      <dt className="text-muted-foreground">{key}</dt>
+                      <dd className="break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </CardContent>
         </Card>
         <div className="lg:col-span-2">

@@ -8,6 +8,7 @@ import {
 import { vistaStepForField } from "../../../../contracts/vista-form";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { api, useSession } from "@/auth/session";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +86,7 @@ export default function VistaPublish({
   const [key, setKey] = useState(crypto.randomUUID());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const notifiedOperations = useRef(new Map<number, string>());
   const pub = q.data?.data;
   const pending = q.data?.operations.some((o) =>
     ["pending", "processing", "uncertain"].includes(o.status),
@@ -104,11 +106,40 @@ export default function VistaPublish({
     return () => clearTimeout(timer);
   }, [pending, reloadPublication, loadingPublication, refresh]);
 
+  useEffect(() => {
+    for (const operation of q.data?.operations ?? []) {
+      const previous = notifiedOperations.current.get(operation.id);
+      if (previous === operation.status) continue;
+      notifiedOperations.current.set(operation.id, operation.status);
+      if (operation.status === "completed") {
+        toast.success(t("vista.publishedToast", { id: operation.id }));
+      } else if (["uncertain", "rejected"].includes(operation.status)) {
+        toast.error(
+          translateError(
+            operation.last_error || t("vista.publishFailedToast"),
+          ),
+        );
+      }
+    }
+  }, [q.data?.operations, t, translateError]);
+
   async function action(path: string) {
     setBusy(true);
     setError("");
     try {
-      await api.post(path);
+      const result = await api.request<{
+        data: { status: string; id: number; last_error?: string | null };
+        completed?: boolean;
+        queued?: boolean;
+        message?: string;
+      }>(path, { method: "POST", body: "{}" });
+      if (result.completed || result.data.status === "completed") {
+        toast.success(result.message || t("vista.publishedToast", { id: result.data.id }));
+      } else if (["uncertain", "rejected"].includes(result.data.status)) {
+        toast.error(translateError(result.message || result.data.last_error || t("vista.publishFailedToast")));
+      } else {
+        toast.info(result.message || t("vista.queuedToast"));
+      }
       q.reload();
       refresh();
     } catch (e) {
@@ -312,20 +343,43 @@ export default function VistaPublish({
                     setBusy(true);
                     setError("");
                     void api
-                      .post("/products/" + product.id + "/vista", {
+                      .request<{
+                        data: { status: string; id: number; last_error?: string | null };
+                        completed?: boolean;
+                        queued?: boolean;
+                        message?: string;
+                      }>("/products/" + product.id + "/vista", {
+                        method: "POST",
+                        body: JSON.stringify({
                         version: product.version,
                         quantity: quantityForPublication,
                         creation_key: key,
                         expected_version: pub?.remote_version,
                         mapping: publicationValues(meta!, values),
+                        }),
                       })
-                      .then(() => {
-                        setOpen(false);
-                        navigate(`/products/${product.id}`);
+                      .then((result) => {
                         q.reload();
                         refresh();
+                        if (result.completed || result.data.status === "completed") {
+                          toast.success(result.message || t("vista.publishedToast", { id: result.data.id }));
+                          setOpen(false);
+                          navigate(`/products/${product.id}`);
+                          return;
+                        }
+                        if (["uncertain", "rejected"].includes(result.data.status)) {
+                          toast.error(translateError(result.message || result.data.last_error || t("vista.publishFailedToast")));
+                          return;
+                        }
+                        toast.info(result.message || t("vista.queuedToast"));
+                        setOpen(false);
+                        navigate(`/products/${product.id}`);
                       })
-                      .catch((e) => setError(translateError(e.message)))
+                      .catch((e) => {
+                        const message = translateError(e instanceof Error ? e.message : t("vista.publishFailedToast"));
+                        setError(message);
+                        toast.error(message);
+                      })
                       .finally(() => setBusy(false));
                   }}
                 >

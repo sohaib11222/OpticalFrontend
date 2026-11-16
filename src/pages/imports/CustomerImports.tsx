@@ -1,1038 +1,182 @@
-import { useEffect, useState, type FormEvent } from "react";
-import UploadProcessingStatus from "@/components/UploadProcessingStatus";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Upload, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, RefreshCw, Upload, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 import { api, useSession } from "@/auth/session";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { ApiError } from "../../../../contracts/session";
 import type { Page } from "../../../../contracts/customers";
-import type {
-  CustomerImport,
-  CustomerField,
-  ImportRow,
-} from "../../../../contracts/imports";
+import type { CustomerImport, CustomerField, ImportRow } from "../../../../contracts/imports";
 import type { PrivateDocument } from "../../../../contracts/documents";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTranslation } from "@/i18n";
 
 const selectClass = "h-9 w-full rounded-md border bg-background px-3";
-
-const fields: CustomerField[] = [
-  "first_name",
-  "last_name",
-  "date_of_birth",
-  "phone",
-  "email",
-  "street_address",
-  "city",
-  "postal_code",
-  "sex",
-];
-
-const REQUIRED_FIELDS: CustomerField[] = ["first_name", "last_name"];
-
+const fields: CustomerField[] = ["first_name", "last_name", "date_of_birth", "phone", "email", "street_address", "city", "postal_code", "sex"];
+const requiredFields: CustomerField[] = ["first_name", "last_name"];
 const fieldLabels: Record<CustomerField, string> = {
-  first_name: "imports.field.firstName",
-  last_name: "imports.field.lastName",
-  date_of_birth: "imports.field.dateOfBirth",
-  phone: "imports.field.phone",
-  email: "imports.field.email",
-  street_address: "imports.field.streetAddress",
-  city: "imports.field.city",
-  postal_code: "imports.field.postalCode",
-  sex: "imports.field.sex",
+  first_name: "imports.field.firstName", last_name: "imports.field.lastName", date_of_birth: "imports.field.dateOfBirth", phone: "imports.field.phone", email: "imports.field.email", street_address: "imports.field.streetAddress", city: "imports.field.city", postal_code: "imports.field.postalCode", sex: "imports.field.sex",
 };
 
-const message = (
-  e: unknown,
-  t: (key: string) => string,
-  translateError: (m: string) => string,
-) => translateError(e instanceof ApiError ? e.message : t("imports.actionFailed"));
+type Summary = { total: number; valid: number; duplicates: number; requires_attention: number; imported: number; skipped: number; failed: number };
+type ImportResponse = { data: CustomerImport; counts: Record<string, number>; undecided: number; summary: Summary };
+const processing = (status: string) => ["parsing", "previewing", "committing"].includes(status);
+const errorText = (error: unknown, fallback: string, translate: (value: string) => string) => translate(error instanceof ApiError || error instanceof Error ? error.message : fallback);
 
-const processing = (s: string) =>
-  ["parsing", "previewing", "committing"].includes(s);
+function Status({ value }: { value: string }) {
+  const { t } = useTranslation();
+  const key = value.replace(/_([a-z])/g, (_, character: string) => character.toUpperCase());
+  return <Badge variant={value.includes("error") || value === "failed" ? "destructive" : "secondary"}>{t("imports.status." + key)}</Badge>;
+}
 
 export default function CustomerImports() {
   const { t, translateError } = useTranslation();
-  const [page, setPage] = useState(1);
-  const [upload, setUpload] = useState(false);
   const { user } = useSession();
-  const { data, error, reload } = useApiResource<Page<CustomerImport>>(
-    "/customer-imports?page=" + page,
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("imports.title")}</h1>
-          <p className="text-muted-foreground">{t("imports.subtitle")}</p>
-        </div>
-        {user?.permissions.includes("imports.write") && (
-          <Button onClick={() => setUpload(true)}>
-            <Upload className="size-4" /> {t("imports.importFile")}
-          </Button>
-        )}
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex gap-2">
-            <FileSpreadsheet /> {t("imports.importHistory")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && <p role="alert">{translateError(error)}</p>}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("imports.source")}</TableHead>
-                <TableHead>{t("imports.worksheet")}</TableHead>
-                <TableHead>{t("imports.status")}</TableHead>
-                <TableHead>{t("imports.processed")}</TableHead>
-                <TableHead>{t("imports.started")}</TableHead>
-                <TableHead>{t("imports.action")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data?.data.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell>
-                    {b.source_kind === "vista_express"
-                      ? t("imports.vistaExpressImport", { id: b.id })
-                      : b.file?.title || t("imports.importTitle", { id: b.id })}
-                  </TableCell>
-                  <TableCell>{b.sheet_name || "Preparing"}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {t("imports.status." + b.status.replace(/_/g, ""))}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {b.processed_rows} / {b.total_rows}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(b.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button asChild variant="outline">
-                      <Link to={"/customer-imports/" + b.id}>{t("imports.openImport")}</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {data?.total === 0 && (
-            <p className="py-8 text-center text-muted-foreground">
-              {t("imports.noImports")}
-            </p>
-          )}
-          <div className="flex items-center gap-3 mt-4">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              {t("imports.previousBtn")}
-            </Button>
-            <span>
-              {t("imports.pageOf", { page, total: data?.last_page || 1 })}
-            </span>
-            <Button
-              variant="outline"
-              disabled={page >= (data?.last_page || 1)}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              {t("imports.nextBtn")}
-            </Button>
-            <Button variant="ghost" onClick={reload}>
-              {t("imports.refresh")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      {upload && <ImportUpload onClose={() => setUpload(false)} />}
-    </div>
-  );
+  const [page, setPage] = useState(1);
+  const [uploading, setUploading] = useState(false);
+  const resource = useApiResource<Page<CustomerImport>>("/customer-imports?page=" + page);
+  return <div className="space-y-6">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">{t("imports.title")}</h1><p className="text-muted-foreground">{t("imports.simpleSubtitle")}</p></div>{user?.permissions.includes("imports.write") && <Button onClick={() => setUploading(true)}><Upload className="size-4" />{t("imports.importFile")}</Button>}</div>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="size-5" />{t("imports.importHistory")}</CardTitle></CardHeader><CardContent>
+      {resource.error && <p role="alert" className="mb-4 text-destructive">{translateError(resource.error)}</p>}
+      <Table><TableHeader><TableRow><TableHead>{t("imports.source")}</TableHead><TableHead>{t("imports.status")}</TableHead><TableHead>{t("imports.processed")}</TableHead><TableHead>{t("imports.started")}</TableHead><TableHead>{t("imports.action")}</TableHead></TableRow></TableHeader><TableBody>{resource.data?.data.map((batch) => <TableRow key={batch.id}><TableCell>{batch.source_kind === "vista_express" ? t("imports.vistaExpressImport", { id: batch.id }) : batch.file?.title || t("imports.importTitle", { id: batch.id })}</TableCell><TableCell><Status value={batch.status} /></TableCell><TableCell>{batch.processed_rows} / {batch.total_rows}</TableCell><TableCell>{new Date(batch.created_at).toLocaleString()}</TableCell><TableCell><Button asChild size="sm" variant="outline"><Link to={'/customer-imports/' + batch.id}>{t("imports.openImport")}</Link></Button></TableCell></TableRow>)}</TableBody></Table>
+      {resource.data?.total === 0 && <p className="py-8 text-center text-muted-foreground">{t("imports.noImports")}</p>}
+      <div className="mt-4 flex flex-wrap items-center gap-3"><Button variant="outline" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>{t("imports.previousBtn")}</Button><span>{t("imports.pageOf", { page, total: resource.data?.last_page || 1 })}</span><Button variant="outline" disabled={page >= (resource.data?.last_page || 1)} onClick={() => setPage((value) => value + 1)}>{t("imports.nextBtn")}</Button><Button variant="ghost" onClick={resource.reload}>{t("imports.refresh")}</Button></div>
+    </CardContent></Card>
+    {uploading && <ImportUpload onClose={() => setUploading(false)} />}
+  </div>;
 }
 
 function ImportUpload({ onClose }: { onClose: () => void }) {
   const { t, translateError } = useTranslation();
-  const [file, setFile] = useState<File | null>(null);
-  const [fileId, setFileId] = useState<number | null>(null);
-  const [key, setKey] = useState(() => crypto.randomUUID());
+  const navigate = useNavigate();
+  const [source, setSource] = useState<PrivateDocument | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  async function upload(e: FormEvent) {
-    e.preventDefault();
-    if (!file) return;
-    setBusy(true);
-    setError("");
+  const started = useRef(false);
+  const start = useCallback(async (fileId: number) => {
+    if (started.current) return;
+    started.current = true;
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("title", file.name);
-      body.append("category", "document");
-      body.append("upload_key", key);
-      const r = await api.request<{ data: PrivateDocument }>("/documents", {
-        method: "POST",
-        body,
-      });
-      setFileId(r.data.id);
-    } catch (e) {
-      setError(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{t("imports.uploadFile")}</DialogTitle>
-          <DialogDescription>
-            {t("imports.uploadDescription")}
-          </DialogDescription>
-        </DialogHeader>
-        {fileId ? (
-          <ScannedSource fileId={fileId} />
-        ) : (
-          <form onSubmit={upload} className="space-y-4">
-            <Label htmlFor="import-file">{t("imports.customerFile")}</Label>
-            <Input
-              id="import-file"
-              type="file"
-              accept=".csv,.xlsx"
-              required
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null);
-                setKey(crypto.randomUUID());
-              }}
-            />
-            {file && file.size > 10 * 1024 * 1024 && (
-              <p role="alert">{t("imports.fileTooLarge")}</p>
-            )}
-            <Button disabled={busy || !file || file.size > 10 * 1024 * 1024}>
-              {busy ? t("imports.uploading") : t("imports.uploadForScan")}
-            </Button>
-          </form>
-        )}
-        {error && (
-          <p role="alert" className="text-destructive">
-            {error}
-          </p>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ScannedSource({ fileId }: { fileId: number }) {
-  const { t, translateError } = useTranslation();
-  const { data, error, reload } = useApiResource<{ data: PrivateDocument }>(
-    "/documents/" + fileId,
-  );
-  const [delimiter, setDelimiter] = useState(",");
-  const [sheet, setSheet] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState("");
-  const navigate = useNavigate();
-
+      const result = await api.request<{ data: CustomerImport }>("/customer-imports", { method: "POST", body: JSON.stringify({ file_id: fileId, automatic: true }) });
+      toast.success(t("imports.filePrepared")); onClose(); navigate("/customer-imports/" + result.data.id);
+    } catch (cause) { started.current = false; setError(errorText(cause, t("imports.actionFailed"), translateError)); } finally { setBusy(false); }
+  }, [navigate, onClose, t, translateError]);
   useEffect(() => {
-    if (["pending", "failed"].includes(data?.data.scan_status ?? "")) {
-      const timer = setInterval(reload, 3000);
-      return () => clearInterval(timer);
-    }
-  }, [data?.data.scan_status, reload]);
-
-  async function start() {
-    setBusy(true);
-    setFailure("");
-    try {
-      const r = await api.request<{ data: CustomerImport }>(
-        "/customer-imports",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            file_id: fileId,
-            delimiter,
-            sheet_name: sheet || null,
-          }),
-        },
-      );
-      navigate("/customer-imports/" + r.data.id);
-    } catch (e) {
-      setFailure(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
+    if (!source || source.scan_status !== "pending") return;
+    const timer = window.setTimeout(() => void api.request<{ data: PrivateDocument }>("/documents/" + source.id).then((result) => setSource(result.data)).catch((cause) => setError(errorText(cause, t("imports.actionFailed"), translateError))), 1500);
+    return () => window.clearTimeout(timer);
+  }, [source, t, translateError]);
+  useEffect(() => { if (source?.scan_status === "clean") void start(source.id); }, [source, start]);
+  async function choose(file: File | null) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { setError(t("imports.fileTooLarge")); return; }
+    started.current = false; setBusy(true); setError("");
+    try { const body = new FormData(); body.append("file", file); body.append("title", file.name); body.append("category", "document"); body.append("upload_key", crypto.randomUUID()); const result = await api.request<{ data: PrivateDocument }>("/documents", { method: "POST", body }); setSource(result.data); } catch (cause) { setError(errorText(cause, t("imports.actionFailed"), translateError)); setBusy(false); }
   }
-
-  async function retry() {
-    setBusy(true);
-    try {
-      await api.request("/documents/" + fileId + "/rescan", { method: "POST" });
-      reload();
-    } catch (e) {
-      setFailure(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <p>
-        {t("imports.scannedFile", {
-              status: t(
-                "status." + (data?.data.scan_status || "pending"),
-              ),
-            })}
-      </p>
-      {data?.data.scan_status === "failed" && (
-        <Button disabled={busy} variant="outline" onClick={retry}>
-          {t("imports.retryScan")}
-        </Button>
-      )}
-      {data?.data.scan_status === "rejected" && (
-        <p role="alert">
-          {t("imports.fileRejected")}
-        </p>
-      )}
-      <UploadProcessingStatus />
-      <Label htmlFor="import-delimiter">{t("imports.csvSeparator")}</Label>
-      <select
-        id="import-delimiter"
-        className={selectClass}
-        value={delimiter}
-        onChange={(e) => setDelimiter(e.target.value)}
-      >
-        <option value=",">{t("imports.comma")}</option>
-        <option value=";">{t("imports.semicolon")}</option>
-        <option value="tab">{t("imports.tab")}</option>
-        <option value="|">{t("imports.pipe")}</option>
-      </select>
-      <Label htmlFor="import-sheet">{t("imports.sheetName")}</Label>
-      <Input
-        id="import-sheet"
-        value={sheet}
-        onChange={(e) => setSheet(e.target.value)}
-        placeholder={t("imports.firstSheet")}
-      />
-      <Button
-        disabled={busy || data?.data.scan_status !== "clean"}
-        onClick={start}
-      >
-        {t("imports.continueMapping")}
-      </Button>
-      {(error || failure) && <p role="alert">{translateError(error || failure)}</p>}
-    </div>
-  );
+  async function retryScan() { if (!source) return; setBusy(true); setError(""); try { const result = await api.request<{ data: PrivateDocument }>("/documents/" + source.id + "/rescan", { method: "POST", body: "{}" }); setSource(result.data); } catch (cause) { setError(errorText(cause, t("imports.actionFailed"), translateError)); setBusy(false); } }
+  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>{t("imports.uploadFile")}</DialogTitle><DialogDescription>{t("imports.autoUploadDescription")}</DialogDescription></DialogHeader>{!source ? <div className="space-y-3"><Label htmlFor="import-file">{t("imports.customerFile")}</Label><Input id="import-file" type="file" accept=".csv,.xlsx" disabled={busy} onChange={(event) => void choose(event.target.files?.[0] || null)} />{busy && <p role="status">{t("imports.uploading")}</p>}</div> : <div className="space-y-3 rounded-lg border bg-muted/20 p-4"><p className="font-medium">{source.filename}</p><p>{t("imports.scannedFile", { status: t("status." + source.scan_status) })}</p>{source.scan_status === "pending" && <p role="status">{t("imports.analyzingFile")}</p>}{source.scan_status === "clean" && <p role="status">{t("imports.creatingPreview")}</p>}{source.scan_status === "failed" && <Button disabled={busy} variant="outline" onClick={() => void retryScan()}>{t("imports.retryScan")}</Button>}{source.scan_status === "rejected" && <p role="alert" className="text-destructive">{t("imports.fileRejected")}</p>}</div>}{error && <p role="alert" className="text-destructive">{error}</p>}</DialogContent></Dialog>;
 }
 
 export function CustomerImportDetails() {
-  const { t, translateError } = useTranslation();
-  const { id } = useParams();
-  const resource = useApiResource<{
-    data: CustomerImport;
-    counts: Record<string, number>;
-    undecided: number;
-  }>("/customer-imports/" + id);
-  const [updatedBatch, setUpdatedBatch] = useState<CustomerImport | null>(null);
+  const { id } = useParams(); const { t, translateError } = useTranslation(); const { user } = useSession();
+  const resource = useApiResource<ImportResponse>("/customer-imports/" + id); const [local, setLocal] = useState<CustomerImport | null>(null); const [busy, setBusy] = useState(false); const [problems, setProblems] = useState(false); const [mappingReview, setMappingReview] = useState(false);
   const loaded = resource.data?.data;
-  const b =
-    loaded &&
-    updatedBatch?.id === loaded.id &&
-    updatedBatch.version > loaded.version
-      ? updatedBatch
-      : loaded;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [revision, setRevision] = useState(0);
-  const { user } = useSession();
-  const canWrite = user?.permissions.includes("imports.write") ?? false;
-
-  function refresh(updated?: CustomerImport) {
-    if (updated) setUpdatedBatch(updated);
-    resource.reload();
-    setRevision((r) => r + 1);
-  }
-
-  useEffect(() => {
-    if (b && processing(b.status)) {
-      const timer = setInterval(resource.reload, 2500);
-      return () => clearInterval(timer);
-    }
-  }, [b, resource.reload]);
-
-  async function action(kind: string) {
-    if (!b) return;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api.request<{ data: CustomerImport }>(
-        "/customer-imports/" + id + "/" + kind,
-        {
-          method: "POST",
-          body: JSON.stringify({ version: b.version }),
-        },
-      );
-      refresh(result.data);
-    } catch (e) {
-      setError(message(e, t, translateError));
-      refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      <Button asChild variant="ghost">
-        <Link to="/customer-imports">{t("imports.backToImports")}</Link>
-      </Button>
-      <div className="flex justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {b?.source_kind === "vista_express"
-              ? t("imports.vistaExpressImportTitle")
-              : b?.file?.title ||
-                  t("imports.importTitle", { id: b?.id ?? "" })}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("imports.uploadMapReview")}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => refresh()}>
-          <RefreshCw className="size-4" /> {t("imports.refreshImport")}
-        </Button>
-      </div>
-      {(error || resource.error) && (
-        <p role="alert" className="text-destructive">
-          {translateError(error || resource.error)}
-        </p>
-      )}
-      {b && (
-        <>
-          <Card>
-            <CardContent className="pt-6 space-y-3">
-              <div className="flex flex-wrap gap-4 items-center">
-                <Badge variant="secondary">{t("imports.status." + b.status.replace(/_/g, ""))}</Badge>
-                <span>
-                  {t("imports.rowsProcessed", { processed: b.processed_rows, total: b.total_rows })}
-                </span>
-                <span>
-                    {t("imports.decisionsRemaining", {
-                      count: resource.data?.undecided ?? 0,
-                    })}
-                  </span>
-              </div>
-              {Object.entries(resource.data?.counts || {}).map(
-                ([status, count]) => (
-                  <span key={status} className="inline-block mr-4 text-sm">
-                    {t("imports.status." + status.replace(/_/g, ""))}: {count}
-                  </span>
-                ),
-              )}
-              {b.last_error && <p role="alert">{translateError(b.last_error)}</p>}
-              {processing(b.status) && (
-                <p role="status">
-                  {t("imports.processingMessage")}
-                </p>
-              )}
-              {canWrite && (b.status === "failed" || processing(b.status)) && (
-                <Button
-                  disabled={busy}
-                  variant="outline"
-                  onClick={() => action("retry")}
-                >
-                  {t("imports.resumeProcessing")}
-                </Button>
-              )}
-              {canWrite && b.status === "ready" && (
-                <Button
-                  disabled={busy || resource.data?.undecided !== 0}
-                  onClick={() => action("commit")}
-                >
-                  {t("imports.importReviewedRows")}
-                </Button>
-              )}
-              {b.status === "completed" && (
-                <p role="status">
-                  {t("imports.importComplete")}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          {canWrite &&
-            b.source_kind !== "vista_express" &&
-            ["mapping", "ready"].includes(b.status) &&
-            b.processed_rows === 0 && (
-              <MappingForm key={"mapping:" + b.id + ":" + b.version} batch={b} onSaved={refresh} />
-            )}
-          {b.headers && (
-            <ImportRows
-              key={"rows:" + b.id}
-              revision={revision}
-              batch={b}
-              canWrite={canWrite}
-              onSaved={refresh}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
+  const batch = local && loaded && local.id === loaded.id && local.version >= loaded.version ? local : loaded;
+  const canWrite = user?.permissions.includes("imports.write") ?? false; const summary = resource.data?.summary;
+  const refresh = useCallback((updated?: CustomerImport) => { if (updated) setLocal(updated); resource.reload(); }, [resource]);
+  useEffect(() => { if (!batch || !processing(batch.status)) return; const timer = window.setInterval(resource.reload, 1800); return () => window.clearInterval(timer); }, [batch, resource.reload]);
+  async function importCustomers() { if (!batch) return; setBusy(true); try { const result = await api.request<{ data: CustomerImport }>("/customer-imports/" + batch.id + "/commit", { method: "POST", body: JSON.stringify({ version: batch.version }) }); refresh(result.data); toast.success(t("imports.importStarted")); } catch (cause) { toast.error(errorText(cause, t("imports.actionFailed"), translateError)); } finally { setBusy(false); } }
+  if (!batch) return <div className="space-y-4"><Button asChild variant="ghost"><Link to="/customer-imports">{t("imports.backToImports")}</Link></Button><p role="status">{resource.error ? translateError(resource.error) : t("common.loading")}</p></div>;
+  const needsMapping = batch.mapping_diagnostics?.needs_mapping ?? []; const importable = ["ready", "completed_with_attention", "completed_with_errors"].includes(batch.status);
+  return <div className="space-y-6"><Button asChild variant="ghost"><Link to="/customer-imports">{t("imports.backToImports")}</Link></Button><div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">{batch.file?.title || t("imports.importTitle", { id: batch.id })}</h1><p className="text-muted-foreground">{t("imports.guidedFlow")}</p></div><Button variant="outline" onClick={() => refresh()}><RefreshCw className="size-4" />{t("imports.refreshImport")}</Button></div>{resource.error && <p role="alert" className="text-destructive">{translateError(resource.error)}</p>}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Step number="1" title={t("imports.stepUpload")} detail={batch.file?.filename || t("imports.vistaExpressImport", { id: batch.id })} done={batch.status !== "parsing"} /><Step number="2" title={t("imports.stepMapping")} detail={needsMapping.length ? t("imports.mappingNeedsAttention", { count: needsMapping.length }) : t("imports.mappingDetected", { count: Object.keys(batch.mapping || {}).length })} done={!needsMapping.length} /><Step number="3" title={t("imports.stepValidation")} detail={t("imports.recordsSummary", { valid: summary?.valid ?? 0, attention: summary?.requires_attention ?? 0 })} done={!processing(batch.status) && batch.status !== "mapping"} /><Step number="4" title={t("imports.stepImport")} detail={t("imports.rowsProcessed", { processed: batch.processed_rows, total: batch.total_rows })} done={batch.status.startsWith("completed")} /></div>
+    <Card><CardContent className="space-y-4 pt-6"><div className="flex flex-wrap items-center gap-3"><Status value={batch.status} />{batch.last_error && <span className="text-sm text-destructive">{translateError(batch.last_error)}</span>}</div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label={t("imports.totalRecords")} value={summary?.total ?? batch.total_rows} /><Metric label={t("imports.validRecords")} value={summary?.valid ?? 0} /><Metric label={t("imports.duplicates")} value={summary?.duplicates ?? 0} warn={(summary?.duplicates ?? 0) > 0} /><Metric label={t("imports.needsAttention")} value={summary?.requires_attention ?? 0} warn={(summary?.requires_attention ?? 0) > 0} /></div>{processing(batch.status) && <p role="status">{t("imports.processingMessage")}</p>}<div className="flex flex-wrap gap-2">{canWrite && importable && <Button disabled={busy || ((summary?.valid ?? 0) === 0 && batch.processed_rows === 0)} onClick={() => void importCustomers()}><UsersRound className="size-4" />{t("imports.importCustomers")}</Button>}{canWrite && ["mapping", "ready"].includes(batch.status) && batch.processed_rows === 0 && <Button variant="outline" onClick={() => setMappingReview((open) => !open)}>{mappingReview || batch.status === "mapping" ? t("imports.hideMappingReview") : t("imports.reviewMapping")}</Button>}{canWrite && ((summary?.requires_attention ?? 0) > 0 || batch.status === "completed_with_errors") && <Button variant="outline" onClick={() => setProblems(true)}><AlertTriangle className="size-4" />{t("imports.reviewProblems")}</Button>}</div></CardContent></Card>
+    {(batch.status === "mapping" || mappingReview) && canWrite && <MappingReview batch={batch} optionalReview={batch.status !== "mapping"} onSaved={(updated) => { setMappingReview(false); refresh(updated); }} />}{batch.headers && <DetectedMapping batch={batch} />}{problems && <ProblemRows batch={batch} onClose={() => setProblems(false)} onSaved={refresh} />}
+  </div>;
 }
 
-function MappingForm({
-  batch: b,
-  onSaved,
-}: {
-  batch: CustomerImport;
-  onSaved: (updated?: CustomerImport) => void;
-}) {
+function Step({ number, title, detail, done }: { number: string; title: string; detail: string; done: boolean }) { return <Card className={done ? "border-primary/30" : ""}><CardContent className="flex gap-3 pt-5"><span className={done ? "text-primary" : "text-muted-foreground"}>{done ? <CheckCircle2 className="size-5" /> : <span className="font-semibold">{number}</span>}</span><div><p className="font-medium">{title}</p><p className="text-sm text-muted-foreground">{detail}</p></div></CardContent></Card>; }
+function Metric({ label, value, warn }: { label: string; value: number; warn?: boolean }) { return <div className={warn ? "rounded-lg border border-amber-500/30 bg-amber-500/5 p-3" : "rounded-lg border p-3"}><p className="text-2xl font-semibold">{value}</p><p className="text-sm text-muted-foreground">{label}</p></div>; }
+
+function DetectedMapping({ batch }: { batch: CustomerImport }) { const { t } = useTranslation(); const mapped = batch.mapping_diagnostics?.mapped ?? {}; const additional = batch.mapping_diagnostics?.additional_fields ?? []; return <Card><CardHeader><CardTitle><h2>{t("imports.detectedMapping")}</h2></CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex flex-wrap gap-2">{Object.entries(mapped).map(([field, detail]) => <Badge key={field} variant="secondary">{t(fieldLabels[field as CustomerField])}: {detail.header}</Badge>)}</div>{additional.length > 0 && <p className="text-sm text-muted-foreground">{t("imports.additionalFieldsPreserved", { count: additional.length })}: {additional.map((item) => item.header).join(", ")}</p>}</CardContent></Card>; }
+
+function MappingReview({ batch, onSaved, optionalReview = false }: { batch: CustomerImport; onSaved: (batch?: CustomerImport) => void; optionalReview?: boolean }) {
   const { t, translateError } = useTranslation();
-  const [mapping, setMapping] = useState<
-    Partial<Record<CustomerField, number>>
-  >(b.mapping || {});
-  const [format, setFormat] = useState(b.date_format);
-  const [sheet, setSheet] = useState(b.sheet_name || "");
-  const [delimiter, setDelimiter] = useState(
-    b.delimiter === "\t" ? "tab" : b.delimiter,
-  );
+  const [mapping, setMapping] = useState<Partial<Record<CustomerField, number>>>(batch.mapping || {});
+  const [additional, setAdditional] = useState<Record<number, { action: "custom" | "ignore"; key?: string }>>(batch.additional_mapping || {});
+  const [dateFormat, setDateFormat] = useState(batch.date_format);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const needs = batch.mapping_diagnostics?.needs_mapping ?? requiredFields.filter((field) => mapping[field] === undefined);
+  const headers = batch.headers || [];
+  const mappedColumns = new Set(Object.values(mapping).filter((column): column is number => column !== undefined));
+  const detectedAdditional = new Map((batch.mapping_diagnostics?.additional_fields ?? []).map((item) => [item.column, item]));
+  const additionalFields = headers
+    .map((header, column) => ({ column, header: header || t("imports.unnamedColumn"), key: detectedAdditional.get(column)?.key || header || `Additional field ${column + 1}` }))
+    .filter((item) => !mappedColumns.has(item.column));
+  const fieldsToReview = optionalReview ? fields : needs;
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  function keepAsCustom(next: Record<number, { action: "custom" | "ignore"; key?: string }>, column: number) {
+    next[column] = { action: "custom", key: next[column]?.key || headers[column] || `Additional field ${column + 1}` };
+  }
+
+  function mapStandard(field: CustomerField, column: number | undefined) {
+    const nextMapping = { ...mapping };
+    const nextAdditional = { ...additional };
+    const previousColumn = nextMapping[field];
+    if (column === undefined) {
+      delete nextMapping[field];
+      if (previousColumn !== undefined) keepAsCustom(nextAdditional, previousColumn);
+    } else {
+      if (previousColumn !== undefined && previousColumn !== column) keepAsCustom(nextAdditional, previousColumn);
+      for (const [otherField, mappedColumn] of Object.entries(nextMapping)) {
+        if (otherField !== field && mappedColumn === column) delete nextMapping[otherField as CustomerField];
+      }
+      nextMapping[field] = column;
+      delete nextAdditional[column];
+    }
+    setMapping(nextMapping);
+    setAdditional(nextAdditional);
+  }
+
+  function setColumn(column: number, value: string) {
+    if (value.startsWith("standard:")) {
+      mapStandard(value.slice(9) as CustomerField, column);
+      return;
+    }
+    setAdditional((previous) => ({ ...previous, [column]: { action: value === "ignore" ? "ignore" : "custom", key: previous[column]?.key || headers[column] || `Additional field ${column + 1}` } }));
+  }
+
+  async function save() {
     setBusy(true);
-    setError("");
     try {
-      const result = await api.request<{ data: CustomerImport }>(
-        "/customer-imports/" + b.id + "/mapping",
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            version: b.version,
-            mapping,
-            date_format: format,
-          }),
-        },
-      );
+      const result = await api.request<{ data: CustomerImport }>("/customer-imports/" + batch.id + "/mapping", { method: "PATCH", body: JSON.stringify({ version: batch.version, mapping, additional_mapping: additional, date_format: dateFormat }) });
+      toast.success(t("imports.mappingSaved"));
       onSaved(result.data);
-    } catch (e) {
-      setError(message(e, t, translateError));
+    } catch (cause) {
+      toast.error(errorText(cause, t("imports.actionFailed"), translateError));
     } finally {
       setBusy(false);
     }
   }
 
-  async function configure() {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api.request<{ data: CustomerImport }>(
-        "/customer-imports/" + b.id + "/configure",
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            version: b.version,
-            sheet_name: sheet,
-            delimiter,
-          }),
-        },
-      );
-      onSaved(result.data);
-    } catch (e) {
-      setError(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-return (
-    <Card>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={2}>
-          {t("imports.mappingTitle")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="min-w-40">
-            <Label htmlFor="mapping-sheet">{t("imports.worksheetLabel")}</Label>
-            <select
-              id="mapping-sheet"
-              className={selectClass}
-              value={sheet}
-              onChange={(e) => setSheet(e.target.value)}
-            >
-              {b.sheets?.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label htmlFor="mapping-delimiter">{t("imports.csvSeparatorLabel")}</Label>
-            <select
-              id="mapping-delimiter"
-              className={selectClass}
-              value={delimiter}
-              onChange={(e) => setDelimiter(e.target.value)}
-            >
-              <option value=",">{t("imports.comma")}</option>
-              <option value=";">{t("imports.semicolon")}</option>
-              <option value="tab">{t("imports.tab")}</option>
-              <option value="|">{t("imports.pipe")}</option>
-            </select>
-          </div>
-          <Button disabled={busy} variant="outline" onClick={configure}>
-            {t("imports.reloadColumns")}
-          </Button>
-        </div>
-        <form onSubmit={submit} className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {t("imports.mappingDescription")}
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {fields.map((field) => {
-              const fieldKey = field;
-              return (
-                <div key={field}>
-                  <Label htmlFor={"map-" + field}>
-                    {t(fieldLabels[fieldKey])}
-                    {REQUIRED_FIELDS.includes(field) ? " *" : ""}
-                  </Label>
-                  <select
-                    id={"map-" + field}
-                    className={selectClass}
-                    required={REQUIRED_FIELDS.includes(field)}
-                    value={mapping[fieldKey] ?? ""}
-                    onChange={(e) =>
-                      setMapping((previous) => {
-                        const next = { ...previous };
-                        if (e.target.value === "") delete next[fieldKey];
-                        else next[fieldKey] = Number(e.target.value);
-                        return next;
-                      })
-                    }
-                  >
-                    <option value="">{t("imports.notImported")}</option>
-                    {b.headers?.map((h, i) => (
-                      <option key={i} value={i}>
-                        {t("imports.columnNumber", { num: i + 1, header: h || t("imports.unnamedColumn") })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })}
-          </div>
-          <Label htmlFor="import-date-format">{t("imports.dateFormatLabel")}</Label>
-          <select
-            id="import-date-format"
-            className={selectClass}
-            value={format}
-            onChange={(e) => setFormat(e.target.value)}
-          >
-            <option value="Y-m-d">{t("imports.dateFormatYmd")}</option>
-            <option value="d/m/Y">{t("imports.dateFormatDmy")}</option>
-            <option value="m/d/Y">{t("imports.dateFormatMdy")}</option>
-            <option value="excel">{t("imports.dateFormatExcel")}</option>
-          </select>
-          <Button disabled={busy}>
-            {busy ? t("imports.preparingPreview") : t("imports.validatePreviewBtn")}
-          </Button>
-        </form>
-        {error && <p role="alert">{translateError(error)}</p>}
-      </CardContent>
-    </Card>
-  );
+  return <Card><CardHeader><CardTitle><h2>{optionalReview ? t("imports.mappingReviewTitle") : t("imports.mappingNeedsReview")}</h2></CardTitle></CardHeader><CardContent className="space-y-5"><p className="text-muted-foreground">{optionalReview ? t("imports.mappingReviewHelp") : t("imports.mappingOnlyNeeded")}</p>{fieldsToReview.map((field) => { const inputId = `customer-import-${field}`; return <div key={field}><Label htmlFor={inputId}>{t(fieldLabels[field])}{requiredFields.includes(field) ? " *" : ""}</Label><select id={inputId} className={selectClass} value={mapping[field] ?? ""} onChange={(event) => mapStandard(field, event.target.value === "" ? undefined : Number(event.target.value))}><option value="">{t("imports.selectColumn")}</option>{headers.map((header, column) => <option key={column} value={column}>{column + 1}. {header || t("imports.unnamedColumn")}</option>)}</select></div>; })}{batch.mapping_diagnostics?.date_format_confidence !== undefined && (batch.mapping_diagnostics.date_format_confidence < 0.72 || optionalReview && mapping.date_of_birth !== undefined) && <div><Label htmlFor="customer-import-date-format">{t("imports.dateFormatLabel")}</Label><select id="customer-import-date-format" className={selectClass} value={dateFormat} onChange={(event) => setDateFormat(event.target.value)}><option value="Y-m-d">{t("imports.dateFormatYmd")}</option><option value="d/m/Y">{t("imports.dateFormatDmy")}</option><option value="m/d/Y">{t("imports.dateFormatMdy")}</option><option value="excel">{t("imports.dateFormatExcel")}</option></select></div>}{additionalFields.length > 0 && <details><summary className="cursor-pointer font-medium">{t("imports.adjustAdditionalFields")}</summary><div className="mt-3 space-y-3">{additionalFields.map((item) => <div className="grid gap-2 rounded border p-3 sm:grid-cols-[1fr_180px_1fr]" key={item.column}><span>{item.header}</span><select className={selectClass} value={additional[item.column]?.action === "ignore" ? "ignore" : "custom"} onChange={(event) => setColumn(item.column, event.target.value)}><option value="custom">{t("imports.storeCustomField")}</option><option value="ignore">{t("imports.ignoreColumn")}</option>{fields.map((field) => <option key={field} value={'standard:' + field}>{t("imports.useAs", { field: t(fieldLabels[field]) })}</option>)}</select><Input value={additional[item.column]?.key || item.key} disabled={additional[item.column]?.action === "ignore"} onChange={(event) => setAdditional((previous) => ({ ...previous, [item.column]: { action: previous[item.column]?.action || "custom", key: event.target.value } }))} /></div>)}</div></details>}<Button disabled={busy || requiredFields.some((field) => mapping[field] === undefined)} onClick={() => void save()}>{busy ? t("common.loading") : t("imports.continueValidation")}</Button></CardContent></Card>;
 }
 
-function ImportRows({
-  batch: b,
-  canWrite,
-  onSaved,
-  revision,
-}: {
-  batch: CustomerImport;
-  revision: number;
-  canWrite: boolean;
-  onSaved: (updated?: CustomerImport) => void;
-}) {
-  const { t, translateError } = useTranslation();
-  const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState("");
-  const [selected, setSelected] = useState<ImportRow | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const { data, error: loadError } = useApiResource<Page<ImportRow>>(
-    "/customer-imports/" +
-      b.id +
-      "/rows?" +
-      new URLSearchParams({ page: String(page), status: filter }),
-    revision + b.version,
-  );
-
-  const editable =
-    canWrite && ["ready", "completed_with_errors"].includes(b.status);
-
-  const unambiguous =
-    data?.data.filter(
-      (r) =>
-        r.status === "pending" &&
-        r.decision === "pending" &&
-        !r.errors?.length &&
-        !r.matches?.length &&
-        !r.file_duplicate,
-    ) || [];
-
-  async function bulk() {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api.request<{ data: CustomerImport }>(
-        "/customer-imports/" + b.id + "/decisions",
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            version: b.version,
-            rows: unambiguous.map((r) => ({ id: r.id, decision: "create" })),
-          }),
-        },
-      );
-      onSaved(result.data);
-    } catch (e) {
-      setError(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("imports.sourceRowsOutcomes")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <Label htmlFor="import-result-filter">{t("imports.resultFilterLabel")}</Label>
-            <select
-              id="import-result-filter"
-              className={selectClass}
-              value={filter}
-              onChange={(e) => {
-                setFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">{t("imports.allRowsOpt")}</option>
-              {["pending", "created", "updated", "skipped", "error"].map(
-                (s) => (
-                  <option key={s}>{t("imports.decision." + s)}</option>
-                ),
-              )}
-            </select>
-          </div>
-          {editable && (
-            <Button
-              variant="outline"
-              disabled={busy || !unambiguous.length}
-              onClick={bulk}
-            >
-              {t("imports.bulkCreateBtn", { count: unambiguous.length })}
-            </Button>
-          )}
-        </div>
-        {(error || loadError) && <p role="alert">{translateError(error || loadError)}</p>}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("imports.colRow")}</TableHead>
-              <TableHead>{t("imports.colCustomerSource")}</TableHead>
-              <TableHead>{t("imports.colReview")}</TableHead>
-              <TableHead>{t("imports.colDecision")}</TableHead>
-              <TableHead>{t("imports.colOutcome")}</TableHead>
-              <TableHead>{t("imports.colAction")}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data?.data.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>{r.row_number}</TableCell>
-                <TableCell className="max-w-xs break-words">
-                  {r.payload ? (
-                    <>
-                      <strong>
-                        {r.payload.first_name} {r.payload.last_name}
-                      </strong>
-                      <p>{r.payload.email}</p>
-                      <p>{r.payload.postal_code}</p>
-                    </>
-                  ) : (
-                    r.raw_values.join(" · ")
-                  )}
-                </TableCell>
-                <TableCell>
-                  {r.errors?.map((e) => (
-                    <p key={e} className="text-destructive">
-                      {translateError(e)}
-                    </p>
-                  ))}
-                  {r.file_duplicate && <p>{t("imports.possibleDuplicates")}</p>}
-                  {!!r.matches?.length && (
-                    <p>{t("imports.matchingCustomers", { count: r.matches.length })}</p>
-                  )}
-                  {r.result_error && (
-                    <p role="alert" className="text-destructive">
-                      {translateError(r.result_error)}
-                    </p>
-                  )}
-                </TableCell>
-                <TableCell>{t("imports.decision." + r.decision.replace(/_/g, ""))}</TableCell>
-                <TableCell>
-                  {r.status}
-                  {r.result_customer_id && (
-                    <Button asChild variant="link">
-                      <Link to={"/customers/" + r.result_customer_id}>
-                        {t("imports.openCustomer")}
-                      </Link>
-                    </Button>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {r.payload && (
-                    <Button variant="outline" onClick={() => setSelected(r)}>
-                      {editable && ["pending", "error"].includes(r.status)
-                        ? t("imports.reviewRowTitle", { row: r.row_number })
-                        : t("imports.openImport")}
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <div className="flex gap-3 items-center">
-          <Button
-            variant="outline"
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            {t("imports.previousBtn")}
-          </Button>
-          <span>
-            {t("imports.pageOf", { page, total: data?.last_page || 1 })}
-          </span>
-          <Button
-            variant="outline"
-            disabled={page >= (data?.last_page || 1)}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            {t("imports.nextBtn")}
-          </Button>
-        </div>
-        {selected && (
-          <RowReview
-            batch={b}
-            row={selected}
-            editable={
-              editable && ["pending", "error"].includes(selected.status)
-            }
-            onClose={() => setSelected(null)}
-            onSaved={onSaved}
-          />
-        )}
-      </CardContent>
-    </Card>
-  );
+function ProblemRows({ batch, onClose, onSaved }: { batch: CustomerImport; onClose: () => void; onSaved: (batch?: CustomerImport) => void }) {
+  const { t, translateError } = useTranslation(); const rows = useApiResource<Page<ImportRow>>("/customer-imports/" + batch.id + "/rows?attention=true"); const [selected, setSelected] = useState<ImportRow | null>(null);
+  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto"><DialogHeader><DialogTitle>{t("imports.reviewProblems")}</DialogTitle><DialogDescription>{t("imports.problemHelp")}</DialogDescription></DialogHeader>{rows.error && <p role="alert" className="text-destructive">{translateError(rows.error)}</p>}<div className="space-y-3">{rows.data?.data.map((row) => <div key={row.id} className="rounded-lg border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">{t("imports.rowNumber", { row: row.row_number })}</p><p>{[row.payload?.first_name, row.payload?.last_name].filter(Boolean).join(" ") || row.raw_values.slice(0, 2).join(" ")}</p>{row.errors?.map((error) => <p key={error} className="text-sm text-destructive">{error}</p>)}{row.file_duplicate && <p className="text-sm text-amber-700">{t("imports.possibleDuplicates")}</p>}{row.matches?.length ? <p className="text-sm text-amber-700">{t("imports.matchingCustomers", { count: row.matches.length })}</p> : null}</div><Button size="sm" variant="outline" onClick={() => setSelected(row)}>{t("imports.reviewFix")}</Button></div></div>)}</div>{!rows.data?.data.length && <p className="py-5 text-center text-muted-foreground">{t("imports.noProblems")}</p>}{selected && <ProblemEditor row={selected} batch={batch} onClose={() => setSelected(null)} onSaved={(updated) => { onSaved(updated); rows.reload(); setSelected(null); }} />}</DialogContent></Dialog>;
 }
 
-function RowReview({
-  batch: b,
-  row: r,
-  editable,
-  onClose,
-  onSaved,
-}: {
-  batch: CustomerImport;
-  row: ImportRow;
-  editable: boolean;
-  onClose: () => void;
-  onSaved: (updated?: CustomerImport) => void;
-}) {
-  const { t, translateError } = useTranslation();
-  const [decision, setDecision] = useState(
-    r.decision === "pending" ? "skip" : r.decision,
-  );
-  const [target, setTarget] = useState(String(r.target_customer_id || ""));
-  const [reason, setReason] = useState(r.reason || "");
-  const [overwrite, setOverwrite] = useState(r.overwrite_blanks);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const match = r.matches?.find((c) => c.id === Number(target));
-      const result = await api.request<{ data: CustomerImport }>(
-        "/customer-imports/" + b.id + "/decisions",
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            version: b.version,
-            rows: [
-              {
-                id: r.id,
-                decision,
-                reason,
-                target_customer_id: match?.id,
-                target_version: match?.version,
-                overwrite_blanks: overwrite,
-              },
-            ],
-          }),
-        },
-      );
-      onSaved(result.data);
-      onClose();
-    } catch (e) {
-      setError(message(e, t, translateError));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{t("imports.reviewRowTitle", { row: r.row_number })}</DialogTitle>
-          <DialogDescription>
-            {t("imports.compareSource")}
-          </DialogDescription>
-        </DialogHeader>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2">
-          {fields.map((field) => (
-            <div key={field}>
-              <dt className="text-sm text-muted-foreground">{t(fieldLabels[field])}</dt>
-              <dd className="break-words">{r.payload?.[field] || "—"}</dd>
-            </div>
-          ))}
-        </dl>
-        {r.errors?.map((e) => (
-          <p key={e} role="alert" className="text-destructive">
-            {translateError(e)}
-          </p>
-        ))}
-        {r.matches?.map((c) => (
-          <p key={c.id}>
-            <Link
-              className="underline"
-              target="_blank"
-              rel="noreferrer"
-              to={"/customers/" + c.id}
-            >
-              {c.first_name} {c.last_name} #{c.id}
-            </Link>{" "}
-            · {c.email || c.phone} · {c.status}
-          </p>
-        ))}
-        {editable && (
-          <form onSubmit={save} className="space-y-4">
-            <Label htmlFor="row-decision">{t("imports.colDecision")}</Label>
-            <select
-              id="row-decision"
-              className={selectClass}
-              value={decision}
-              onChange={(e) => setDecision(e.target.value)}
-            >
-              <option value="skip">{t("imports.decisionSkip")}</option>
-              {!r.errors?.length && (
-                <>
-                  {!r.matches?.length && !r.file_duplicate && (
-                    <option value="create">{t("imports.decisionCreate")}</option>
-                  )}
-                  <option value="create_distinct">{t("imports.decisionCreateDistinct")}</option>
-                  {r.matches?.some((c) => c.status === "active") && (
-                    <option value="update">{t("imports.decisionUpdate")}</option>
-                  )}
-                </>
-              )}
-            </select>
-            {decision === "update" && (
-              <>
-                <Label htmlFor="row-target">{t("imports.targetCustomerLabel")}</Label>
-                <select
-                  id="row-target"
-                  className={selectClass}
-                  required
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                >
-                  <option value="">{t("imports.chooseTargetCustomer")}</option>
-                  {r.matches
-                    ?.filter((c) => c.status === "active")
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.first_name} {c.last_name} #{c.id} (version{" "}
-                        {c.version})
-                      </option>
-                    ))}
-                </select>
-                <Label className="flex gap-2 items-start">
-                  <input
-                    type="checkbox"
-                    checked={overwrite}
-                    onChange={(e) => setOverwrite(e.target.checked)}
-                  />{" "}
-                  {t("imports.overwriteBlanksLabel")}
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {t("imports.unmappedPreserved")}
-                </p>
-              </>
-            )}
-            <Label htmlFor="row-reason">{t("imports.reviewReasonLabel")}</Label>
-            <Textarea
-              id="row-reason"
-              value={reason}
-              required={["update", "create_distinct"].includes(decision)}
-              minLength={["update", "create_distinct"].includes(decision) ? 3 : undefined}
-              maxLength={2000}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <Button disabled={busy}>{t("imports.saveRowDecisionBtn")}</Button>
-          </form>
-        )}
-        {error && <p role="alert">{translateError(error)}</p>}
-      </DialogContent>
-    </Dialog>
-  );
+function ProblemEditor({ row, batch, onClose, onSaved }: { row: ImportRow; batch: CustomerImport; onClose: () => void; onSaved: (batch?: CustomerImport) => void }) {
+  const { t, translateError } = useTranslation(); const [payload, setPayload] = useState<Record<CustomerField, string>>(() => Object.fromEntries(fields.map((field) => [field, row.payload?.[field] || ""])) as Record<CustomerField, string>); const [custom, setCustom] = useState<Record<string, string>>(row.custom_fields || {}); const [busy, setBusy] = useState(false);
+  async function correct() { setBusy(true); try { const result = await api.request<{ data: CustomerImport }>("/customer-imports/" + batch.id + "/rows/" + row.id, { method: "PATCH", body: JSON.stringify({ version: batch.version, payload, custom_fields: custom }) }); toast.success(t("imports.rowCorrected")); onSaved(result.data); } catch (cause) { toast.error(errorText(cause, t("imports.actionFailed"), translateError)); } finally { setBusy(false); } }
+  async function decide(decision: "skip" | "create_distinct" | "update") { setBusy(true); try { const match = row.matches?.[0]; const result = await api.request<{ data: CustomerImport }>("/customer-imports/" + batch.id + "/decisions", { method: "PATCH", body: JSON.stringify({ version: batch.version, rows: [{ id: row.id, decision, target_customer_id: decision === "update" ? match?.id : undefined, target_version: decision === "update" ? match?.version : undefined, reason: decision === "skip" ? undefined : t("imports.reviewedReason") }] }) }); toast.success(t("imports.decisionSaved")); onSaved(result.data); } catch (cause) { toast.error(errorText(cause, t("imports.actionFailed"), translateError)); } finally { setBusy(false); } }
+  return <div className="mt-5 rounded-lg border bg-muted/20 p-4"><div className="mb-3 flex items-center justify-between"><p className="font-medium">{t("imports.reviewRowTitle", { row: row.row_number })}</p><Button size="sm" variant="ghost" onClick={onClose}>{t("common.close")}</Button></div><div className="grid gap-3 sm:grid-cols-2">{fields.map((field) => <div key={field} className={field === "street_address" ? "sm:col-span-2" : ""}><Label>{t(fieldLabels[field])}{requiredFields.includes(field) ? " *" : ""}</Label><Input type={field === "date_of_birth" ? "date" : "text"} value={payload[field]} onChange={(event) => setPayload((previous) => ({ ...previous, [field]: event.target.value }))} /></div>)}</div>{Object.keys(custom).length > 0 && <div className="mt-3 space-y-2"><Label>{t("imports.extraInformation")}</Label>{Object.entries(custom).map(([key, value]) => <div className="flex gap-2" key={key}><Input value={key} disabled /><Input value={value} onChange={(event) => setCustom((previous) => ({ ...previous, [key]: event.target.value }))} /></div>)}</div>}<div className="mt-4 flex flex-wrap gap-2"><Button disabled={busy} onClick={() => void correct()}>{t("imports.saveCorrection")}</Button><Button disabled={busy} variant="outline" onClick={() => void decide("skip")}>{t("imports.decisionSkip")}</Button>{row.matches?.[0] && <Button disabled={busy} variant="outline" onClick={() => void decide("update")}>{t("imports.updateMatchingCustomer")}</Button>}{(row.matches?.length || row.file_duplicate) ? <Button disabled={busy} variant="outline" onClick={() => void decide("create_distinct")}>{t("imports.decisionCreateDistinct")}</Button> : null}</div></div>;
 }
