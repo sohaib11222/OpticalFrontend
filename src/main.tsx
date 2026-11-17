@@ -9,6 +9,7 @@ import UIThemeProvider from "@/providers/ui-theme-provider";
 import { TranslationProvider } from "@/i18n";
 
 import { router } from "@/routes";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
 import "@/index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -22,7 +23,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <UIThemeProvider>
         <TranslationProvider>
           <SessionProvider>
-            <RouterProvider router={router} />
+            <AppErrorBoundary>
+              <RouterProvider router={router} />
+            </AppErrorBoundary>
           </SessionProvider>
         </TranslationProvider>
       </UIThemeProvider>

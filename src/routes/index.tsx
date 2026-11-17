@@ -35,6 +35,7 @@ import FoundationHome from "@/pages/FoundationHome";
 import AccountSecurity from "@/pages/account/AccountSecurity";
 import NotFound from "@/pages/NotFound";
 import SupportTickets from "@/pages/support/SupportTickets";
+import RouteErrorFallback from "@/components/RouteErrorFallback";
 export const router = createBrowserRouter(
   [
     { path: "/auth/vista/callback", element: <VistaCallback /> },
@@ -50,6 +51,7 @@ export const router = createBrowserRouter(
     },
     {
       element: <ProtectedRoute />,
+      errorElement: <RouteErrorFallback />,
       children: [
         {
           element: <AppLayout />,

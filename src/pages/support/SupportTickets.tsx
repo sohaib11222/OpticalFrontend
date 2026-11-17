@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, useSession } from "@/auth/session";
 import { useApiResource } from "@/hooks/use-api-resource";
@@ -124,10 +125,14 @@ function NewTicket({ onClose, onCreated }: { onClose: () => void; onCreated: (ti
 
 export default function SupportTickets() {
   const { user } = useSession();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
   const [creating, setCreating] = useState(false);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const ticket = Number(searchParams.get("ticket"));
+    return Number.isInteger(ticket) && ticket > 0 ? ticket : null;
+  });
   const params = useMemo(() => new URLSearchParams({ ...(status ? { status } : {}), ...(priority ? { priority } : {}) }).toString(), [status, priority]);
   const { data, error, loading, reload } = useApiResource<Page<Ticket>>(`/support/tickets?${params}`);
   const notices = useApiResource<{ data: TicketNotice[]; unread: number }>("/support/notifications");
@@ -137,6 +142,17 @@ export default function SupportTickets() {
     const timer = setInterval(() => { void reload(); void notices.reload(); }, 20000);
     return () => clearInterval(timer);
   }, [reload, notices.reload]);
+  useEffect(() => {
+    const ticket = Number(searchParams.get("ticket"));
+    if (Number.isInteger(ticket) && ticket > 0) setSelected(ticket);
+  }, [searchParams]);
+  const closeTicket = () => {
+    setSelected(null);
+    if (!searchParams.has("ticket")) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("ticket");
+    setSearchParams(next, { replace: true });
+  };
   const openNotice = async (notice: TicketNotice) => {
     try {
       if (!notice.read_at) await api.request(`/support/notifications/${notice.id}/read`, { method: "POST" });
@@ -145,5 +161,5 @@ export default function SupportTickets() {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Unable to open the ticket notification."); }
   };
   if (!canRead) return <Card><CardContent className="p-6">You do not have access to support tickets.</CardContent></Card>;
-  return <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>Support tickets</CardTitle><p className="text-sm text-muted-foreground mt-1">Ask the Vista Express 360 support team for help and track every reply.</p></div>{canCreate && <Button onClick={() => setCreating(true)}>New ticket</Button>}</div></CardHeader><CardContent className="space-y-4">{!!notices.data?.unread && <div className="rounded-lg border border-primary/30 bg-primary/5 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{notices.data.unread} unread support update{notices.data.unread === 1 ? "" : "s"}</p><Button variant="ghost" size="sm" onClick={() => void notices.reload()}>Refresh updates</Button></div><div className="mt-2 flex flex-wrap gap-2">{notices.data.data.filter((notice) => !notice.read_at).slice(0, 5).map((notice) => <Button key={notice.id} variant="outline" size="sm" onClick={() => void openNotice(notice)}>{notice.ticket?.public_id || "Ticket"} · {notice.ticket?.subject || notice.kind}</Button>)}</div></div>}<div className="flex flex-wrap gap-3"><select className="h-9 rounded-md border bg-background px-3" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{["open", "in_progress", "waiting_for_response", "resolved", "closed"].map((value) => <option key={value}>{value}</option>)}</select><select className="h-9 rounded-md border bg-background px-3" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="">All priorities</option>{priorities.map((value) => <option key={value}>{value}</option>)}</select><Button variant="outline" onClick={reload}>Refresh</Button></div>{error && <p role="alert" className="text-destructive">{error}</p>}{loading && <p>Loading tickets…</p>}<Table><TableHeader><TableRow><TableHead>Ticket</TableHead><TableHead>Category</TableHead><TableHead>Priority</TableHead><TableHead>Status</TableHead><TableHead>Updated</TableHead><TableHead /></TableRow></TableHeader><TableBody>{data?.data.map((ticket) => <TableRow key={ticket.id}><TableCell><p className="font-medium">{ticket.subject}</p><p className="text-xs text-muted-foreground">{ticket.public_id}</p></TableCell><TableCell>{ticket.category}</TableCell><TableCell><Badge variant={ticket.priority === "urgent" ? "destructive" : "secondary"}>{ticket.priority}</Badge></TableCell><TableCell><Badge variant={ticket.status === "closed" ? "outline" : "secondary"}>{ticket.status.split("_").join(" ")}</Badge></TableCell><TableCell>{new Date(ticket.updated_at).toLocaleString()}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setSelected(ticket.id)}>Open</Button></TableCell></TableRow>)}</TableBody></Table>{!loading && !data?.data.length && <p className="py-8 text-center text-muted-foreground">No support tickets match these filters.</p>}{creating && <NewTicket onClose={() => setCreating(false)} onCreated={async (ticket) => { setCreating(false); await reload(); setSelected(ticket.id); }} />}{selected && <TicketDetail ticketId={selected} onClose={() => setSelected(null)} onChanged={reload} />}</CardContent></Card>;
+  return <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>Support tickets</CardTitle><p className="text-sm text-muted-foreground mt-1">Ask the Vista Express 360 support team for help and track every reply.</p></div>{canCreate && <Button onClick={() => setCreating(true)}>New ticket</Button>}</div></CardHeader><CardContent className="space-y-4">{!!notices.data?.unread && <div className="rounded-lg border border-primary/30 bg-primary/5 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{notices.data.unread} unread support update{notices.data.unread === 1 ? "" : "s"}</p><Button variant="ghost" size="sm" onClick={() => void notices.reload()}>Refresh updates</Button></div><div className="mt-2 flex flex-wrap gap-2">{notices.data.data.filter((notice) => !notice.read_at).slice(0, 5).map((notice) => <Button key={notice.id} variant="outline" size="sm" onClick={() => void openNotice(notice)}>{notice.ticket?.public_id || "Ticket"} · {notice.ticket?.subject || notice.kind}</Button>)}</div></div>}<div className="flex flex-wrap gap-3"><select className="h-9 rounded-md border bg-background px-3" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{["open", "in_progress", "waiting_for_response", "resolved", "closed"].map((value) => <option key={value}>{value}</option>)}</select><select className="h-9 rounded-md border bg-background px-3" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="">All priorities</option>{priorities.map((value) => <option key={value}>{value}</option>)}</select><Button variant="outline" onClick={reload}>Refresh</Button></div>{error && <p role="alert" className="text-destructive">{error}</p>}{loading && <p>Loading tickets…</p>}<Table><TableHeader><TableRow><TableHead>Ticket</TableHead><TableHead>Category</TableHead><TableHead>Priority</TableHead><TableHead>Status</TableHead><TableHead>Updated</TableHead><TableHead /></TableRow></TableHeader><TableBody>{data?.data.map((ticket) => <TableRow key={ticket.id}><TableCell><p className="font-medium">{ticket.subject}</p><p className="text-xs text-muted-foreground">{ticket.public_id}</p></TableCell><TableCell>{ticket.category}</TableCell><TableCell><Badge variant={ticket.priority === "urgent" ? "destructive" : "secondary"}>{ticket.priority}</Badge></TableCell><TableCell><Badge variant={ticket.status === "closed" ? "outline" : "secondary"}>{ticket.status.split("_").join(" ")}</Badge></TableCell><TableCell>{new Date(ticket.updated_at).toLocaleString()}</TableCell><TableCell><Button variant="outline" size="sm" onClick={() => setSelected(ticket.id)}>Open</Button></TableCell></TableRow>)}</TableBody></Table>{!loading && !data?.data.length && <p className="py-8 text-center text-muted-foreground">No support tickets match these filters.</p>}{creating && <NewTicket onClose={() => setCreating(false)} onCreated={async (ticket) => { setCreating(false); await reload(); setSelected(ticket.id); }} />}{selected && <TicketDetail ticketId={selected} onClose={closeTicket} onChanged={reload} />}</CardContent></Card>;
 }
